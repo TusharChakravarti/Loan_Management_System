@@ -15,11 +15,11 @@ export default function ApplyLoanPage() {
 
   const [step, setStep] = useState<number>(1);
 
-  // Form State
+  // Form State (Clean initialization without hardcoded test demo data)
   const [fullName, setFullName] = useState<string>(user?.fullName || '');
-  const [pan, setPan] = useState<string>('ABCDE1234F');
-  const [dateOfBirth, setDateOfBirth] = useState<string>('1998-05-15');
-  const [monthlySalary, setMonthlySalary] = useState<number>(45000);
+  const [pan, setPan] = useState<string>('');
+  const [dateOfBirth, setDateOfBirth] = useState<string>('');
+  const [monthlySalary, setMonthlySalary] = useState<number | ''>('');
   const [employmentMode, setEmploymentMode] = useState<EmploymentMode>('SALARIED');
 
   // BRE State
@@ -43,18 +43,24 @@ export default function ApplyLoanPage() {
 
   // Calculation Math
   const interestRate = 12;
+  const numericSalary = typeof monthlySalary === 'number' ? monthlySalary : 0;
   const simpleInterest = Math.round(((loanAmount * interestRate * tenureDays) / (365 * 100)) * 100) / 100;
   const totalRepayment = Math.round((loanAmount + simpleInterest) * 100) / 100;
 
   // Step 1 -> Step 2: Trigger BRE
   const handleRunBRE = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!fullName || !pan || !dateOfBirth || !monthlySalary) {
+      alert('Please fill in all required applicant details.');
+      return;
+    }
+
     setBreLoading(true);
     setBreResult(null);
     try {
       const res = await loanApi.checkBRE({
         dateOfBirth,
-        monthlySalary,
+        monthlySalary: Number(monthlySalary),
         pan,
         employmentMode,
       });
@@ -75,12 +81,22 @@ export default function ApplyLoanPage() {
     try {
       const res = await loanApi.uploadSalarySlip(selectedFile);
       setUploadedUrl(res.salarySlipUrl);
-      setUploadedName(res.originalName);
+      setUploadedName(res.originalName || selectedFile.name);
       setStep(4);
     } catch (err: any) {
-      setUploadError(err.message || 'File upload failed');
+      setUploadError(err.message || 'Unable to upload salary slip file. Please try again.');
     } finally {
       setUploading(false);
+    }
+  };
+
+  // Secure Document Preview Handler
+  const handlePreviewDocument = () => {
+    if (uploadedUrl) {
+      window.open(uploadedUrl, '_blank', 'noopener,noreferrer');
+    } else if (selectedFile) {
+      const tempObjectUrl = URL.createObjectURL(selectedFile);
+      window.open(tempObjectUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -93,16 +109,16 @@ export default function ApplyLoanPage() {
         fullName,
         pan: pan.toUpperCase(),
         dateOfBirth,
-        monthlySalary,
+        monthlySalary: numericSalary,
         employmentMode,
         salarySlipUrl: uploadedUrl,
-        salarySlipOriginalName: uploadedName,
+        salarySlipOriginalName: uploadedName || selectedFile?.name || 'SalarySlip.pdf',
         loanAmount,
         tenureDays,
       });
       router.push(`/borrower/loans/${res.loan._id}`);
     } catch (err: any) {
-      setSubmitError(err.message || 'Loan submission failed');
+      setSubmitError(err.message || 'Loan submission failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -168,6 +184,7 @@ export default function ApplyLoanPage() {
                     <input
                       type="text"
                       required
+                      placeholder="e.g. John Doe"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       className="w-full p-2.5 rounded-lg border border-slate-300 text-sm font-medium text-slate-900"
@@ -179,6 +196,7 @@ export default function ApplyLoanPage() {
                     <input
                       type="text"
                       required
+                      placeholder="e.g. ABCDE1234F"
                       pattern="^[A-Za-z]{5}[0-9]{4}[A-Za-z]$"
                       title="PAN format: ABCDE1234F"
                       value={pan}
@@ -204,8 +222,9 @@ export default function ApplyLoanPage() {
                       type="number"
                       required
                       min={0}
+                      placeholder="e.g. 50000"
                       value={monthlySalary}
-                      onChange={(e) => setMonthlySalary(Number(e.target.value))}
+                      onChange={(e) => setMonthlySalary(e.target.value === '' ? '' : Number(e.target.value))}
                       className="w-full p-2.5 rounded-lg border border-slate-300 text-sm font-bold text-slate-900"
                     />
                   </div>
@@ -230,7 +249,7 @@ export default function ApplyLoanPage() {
                     disabled={breLoading}
                     className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-lg transition-colors shadow-sm disabled:opacity-50"
                   >
-                    {breLoading ? 'Running BRE Verification...' : 'Validate BRE & Continue'}
+                    {breLoading ? 'Running BRE Verification...' : 'Validate BRE & Continue →'}
                   </button>
                 </div>
               </form>
@@ -256,7 +275,14 @@ export default function ApplyLoanPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="pt-4 flex justify-end">
+                    <div className="pt-4 flex justify-between items-center">
+                      <button
+                        onClick={() => setStep(1)}
+                        className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-bold text-xs rounded-lg hover:bg-slate-50 transition-colors"
+                      >
+                        ← Edit Info
+                      </button>
+
                       <button
                         onClick={() => setStep(3)}
                         className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-lg transition-colors"
@@ -334,7 +360,7 @@ export default function ApplyLoanPage() {
                     />
                     <label htmlFor="salarySlipInput" className="cursor-pointer space-y-2 block">
                       <span className="text-blue-600 font-bold text-sm block">Choose Document File</span>
-                      <span className="text-xs text-slate-400 block">
+                      <span className="text-xs text-slate-500 font-semibold block">
                         {selectedFile ? selectedFile.name : 'Click to browse file from device'}
                       </span>
                     </label>
@@ -462,9 +488,14 @@ export default function ApplyLoanPage() {
             {/* STEP 5: Final Review & Submission */}
             {step === 5 && (
               <div className="space-y-6">
-                <h2 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">
-                  Step 5: Review & Submit Application
-                </h2>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">
+                    Step 5: Review & Submit Application
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium mt-2">
+                    You are about to submit your loan application. Please review all personal details, loan structure, and your uploaded salary slip document before confirming.
+                  </p>
+                </div>
 
                 {submitError && (
                   <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-lg">
@@ -472,36 +503,99 @@ export default function ApplyLoanPage() {
                   </div>
                 )}
 
+                {/* Card Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                    <span className="font-bold text-slate-500 uppercase tracking-wider block border-b border-slate-200 pb-1">
-                      Applicant Details
-                    </span>
-                    <p><strong>Name:</strong> {fullName}</p>
-                    <p><strong>PAN:</strong> {pan}</p>
-                    <p><strong>DOB:</strong> {dateOfBirth}</p>
-                    <p><strong>Salary:</strong> ₹{monthlySalary.toLocaleString('en-IN')}</p>
-                    <p><strong>Employment:</strong> {employmentMode}</p>
+                  {/* Applicant Details Card */}
+                  <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                      <span className="font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                        Applicant Details
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setStep(1)}
+                        className="text-[11px] font-bold text-blue-600 hover:underline"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                    <div className="space-y-1.5 text-slate-800">
+                      <p><strong className="text-slate-500 font-semibold">Full Name:</strong> {fullName}</p>
+                      <p><strong className="text-slate-500 font-semibold">PAN Card:</strong> <span className="font-mono uppercase">{pan}</span></p>
+                      <p><strong className="text-slate-500 font-semibold">Date of Birth:</strong> {dateOfBirth}</p>
+                      <p><strong className="text-slate-500 font-semibold">Monthly Salary:</strong> ₹{numericSalary.toLocaleString('en-IN')}</p>
+                      <p><strong className="text-slate-500 font-semibold">Employment Mode:</strong> {employmentMode}</p>
+                    </div>
                   </div>
 
-                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                    <span className="font-bold text-slate-500 uppercase tracking-wider block border-b border-slate-200 pb-1">
-                      Loan Structure
-                    </span>
-                    <p><strong>Principal:</strong> ₹{loanAmount.toLocaleString('en-IN')}</p>
-                    <p><strong>Tenure:</strong> {tenureDays} Days</p>
-                    <p><strong>Interest Rate:</strong> 12% p.a.</p>
-                    <p><strong>Simple Interest:</strong> ₹{simpleInterest.toLocaleString('en-IN')}</p>
-                    <p className="text-sm font-bold text-blue-700">
-                      Total Repayment: ₹{totalRepayment.toLocaleString('en-IN')}
-                    </p>
+                  {/* Loan Structure Card */}
+                  <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                      <span className="font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                        Loan Details
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setStep(4)}
+                        className="text-[11px] font-bold text-blue-600 hover:underline"
+                      >
+                        Configure
+                      </button>
+                    </div>
+                    <div className="space-y-1.5 text-slate-800">
+                      <p><strong className="text-slate-500 font-semibold">Requested Amount:</strong> ₹{loanAmount.toLocaleString('en-IN')}</p>
+                      <p><strong className="text-slate-500 font-semibold">Tenure Duration:</strong> {tenureDays} Days</p>
+                      <p><strong className="text-slate-500 font-semibold">Interest Rate:</strong> 12% p.a. (Fixed)</p>
+                      <p><strong className="text-slate-500 font-semibold">Simple Interest:</strong> ₹{simpleInterest.toLocaleString('en-IN')}</p>
+                      <p className="text-sm font-black text-blue-700 pt-1">
+                        Total Repayment: ₹{totalRepayment.toLocaleString('en-IN')}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
-                  Document attached: <strong>{uploadedName}</strong> (BRE Verification Passed)
+                {/* Documents & Verification Card */}
+                <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                  <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                    <span className="font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                      Uploaded Document & Verification
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setStep(3)}
+                      className="text-[11px] font-bold text-blue-600 hover:underline"
+                    >
+                      Reupload
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div className="space-y-1">
+                      <span className="text-xs font-bold text-slate-900 block">
+                        📄 {uploadedName || selectedFile?.name || 'SalarySlip.pdf'}
+                      </span>
+                      <div className="flex flex-wrap gap-2 text-[10px]">
+                        <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                          ✓ Uploaded
+                        </span>
+                        <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                          ✓ BRE Verification Passed
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handlePreviewDocument}
+                      className="px-3.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5"
+                    >
+                      <span>Preview Document</span>
+                      <span>↗</span>
+                    </button>
+                  </div>
                 </div>
 
+                {/* Actions */}
                 <div className="flex justify-between items-center pt-2">
                   <button
                     type="button"
