@@ -240,11 +240,12 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
 
     const fileName = loan.salarySlipOriginalName || `salary-slip-${loan._id}${ext || '.pdf'}`;
 
-    // Set headers for inline browser document rendering
+    // Set headers for inline browser document rendering & expose Content-Disposition for CORS clients
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
 
-    // 1. Check if document is stored locally on disk
+    // 1. Check if document is stored locally on disk (Legacy records only)
     if (loan.salarySlipUrl.startsWith('/uploads/salary-slips/')) {
       const sanitizedFilename = path.basename(loan.salarySlipUrl);
       const filePath = path.join(process.cwd(), 'uploads', 'salary-slips', sanitizedFilename);

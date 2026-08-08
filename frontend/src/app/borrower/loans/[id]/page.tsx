@@ -30,7 +30,7 @@ export default function SingleLoanDetailPage() {
   const handleViewSalarySlip = async (loanId: string) => {
     setFetchingDoc(true);
     try {
-      await loanApi.previewSalarySlip(loanId);
+      await loanApi.previewSalarySlip(loanId, loan?.salarySlipOriginalName);
     } catch (err: any) {
       alert(err.message || 'Failed to retrieve salary slip document');
     } finally {

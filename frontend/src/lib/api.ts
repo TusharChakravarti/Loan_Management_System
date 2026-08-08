@@ -167,7 +167,7 @@ export const loanApi = {
     });
   },
 
-  previewSalarySlip: async (loanId: string): Promise<void> => {
+  previewSalarySlip: async (loanId: string, fallbackName?: string): Promise<void> => {
     const token = getAuthToken();
     const response = await fetch(`${API_BASE_URL}/loans/${loanId}/salary-slip/preview`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -178,9 +178,44 @@ export const loanApi = {
       return;
     }
 
+    // Extract filename from Content-Disposition header
+    let fileName = fallbackName || `salary-slip-${loanId.slice(-6)}.pdf`;
+    const disposition = response.headers.get('Content-Disposition');
+    if (disposition && disposition.includes('filename=')) {
+      const match = disposition.match(/filename="?([^";]+)"?/);
+      if (match && match[1]) {
+        fileName = match[1];
+      }
+    }
+
+    const contentType = response.headers.get('Content-Type') || 'application/pdf';
     const blob = await response.blob();
     const objectUrl = URL.createObjectURL(blob);
-    window.open(objectUrl, '_blank', 'noopener,noreferrer');
+
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>${fileName}</title>
+            <style>
+              html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #525659; }
+              embed, iframe { width: 100%; height: 100%; border: none; }
+            </style>
+          </head>
+          <body>
+            <embed src="${objectUrl}" type="${contentType}" width="100%" height="100%" />
+          </body>
+        </html>
+      `);
+      win.document.close();
+
+      setTimeout(() => {
+        URL.revokeObjectURL(objectUrl);
+      }, 60000);
+    }
   },
 
   getSalarySlipUrl: async (loanId: string): Promise<{ url: string; originalName: string }> => {
