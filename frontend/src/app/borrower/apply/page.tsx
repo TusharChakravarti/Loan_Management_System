@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
+import { BorrowerNav } from '../../../components/BorrowerNav';
 import { useAuth } from '../../../context/AuthContext';
 import { loanApi } from '../../../lib/api';
 import { BREResult, EmploymentMode } from '../../../types/loan';
@@ -109,8 +110,10 @@ export default function ApplyLoanPage() {
 
   return (
     <ProtectedRoute allowedRoles={['BORROWER']}>
-      <div className="min-h-screen bg-slate-100 p-6">
-        <div className="max-w-3xl mx-auto space-y-6">
+      <div className="min-h-screen bg-slate-100 pb-12">
+        <BorrowerNav title="Apply for Loan" subtitle="Multi-step borrower application wizard" />
+
+        <div className="max-w-3xl mx-auto px-6 space-y-6">
           {/* Header */}
           <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <div>

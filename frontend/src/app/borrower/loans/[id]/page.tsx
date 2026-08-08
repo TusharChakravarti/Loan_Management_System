@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ProtectedRoute } from '../../../../components/ProtectedRoute';
+import { BorrowerNav } from '../../../../components/BorrowerNav';
 import { loanApi } from '../../../../lib/api';
 import { Loan } from '../../../../types/loan';
 import { useParams } from 'next/navigation';
@@ -40,8 +41,10 @@ export default function SingleLoanDetailPage() {
 
   return (
     <ProtectedRoute allowedRoles={['BORROWER']}>
-      <div className="min-h-screen bg-slate-100 p-6">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <div className="min-h-screen bg-slate-100 pb-12">
+        <BorrowerNav title="Application Detail" subtitle="View details & lifecycle progress" />
+
+        <div className="max-w-4xl mx-auto px-6 space-y-6">
           {/* Top Bar */}
           <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <div>

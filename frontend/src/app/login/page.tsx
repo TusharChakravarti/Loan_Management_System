@@ -5,15 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-const SEED_ACCOUNTS = [
-  { label: 'Admin', email: 'admin@lms.local', pass: 'Admin@12345', role: 'ADMIN' },
-  { label: 'Sales Officer', email: 'sales@lms.local', pass: 'Sales@12345', role: 'SALES' },
-  { label: 'Sanction Officer', email: 'sanction@lms.local', pass: 'Sanction@12345', role: 'SANCTION' },
-  { label: 'Disbursement Mgr', email: 'disbursement@lms.local', pass: 'Disburse@12345', role: 'DISBURSEMENT' },
-  { label: 'Collection Officer', email: 'collection@lms.local', pass: 'Collection@12345', role: 'COLLECTION' },
-  { label: 'Borrower', email: 'borrower@lms.local', pass: 'Borrower@12345', role: 'BORROWER' },
-];
-
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
@@ -53,7 +44,6 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login({ email, password });
-      // Fetch user role from auth API token/response
       const meRes = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api'}/auth/me`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('lms_auth_token')}` },
       });
@@ -68,11 +58,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickFill = (presetEmail: string, presetPass: string) => {
-    setEmail(presetEmail);
-    setPassword(presetPass);
   };
 
   return (
@@ -126,26 +111,6 @@ export default function LoginPage() {
             {loading ? 'Authenticating...' : 'Sign In'}
           </button>
         </form>
-
-        {/* Quick Fill Seed Credentials */}
-        <div className="border-t border-slate-200 pt-4 space-y-2">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-            Available Demo Accounts
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            {SEED_ACCOUNTS.map((acc) => (
-              <button
-                key={acc.role}
-                type="button"
-                onClick={() => handleQuickFill(acc.email, acc.pass)}
-                className="p-2 text-left text-xs bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-md transition-colors font-mono"
-              >
-                <div className="font-semibold text-slate-800">{acc.label}</div>
-                <div className="text-[10px] text-slate-500">{acc.email}</div>
-              </button>
-            ))}
-          </div>
-        </div>
 
         <div className="text-center text-xs text-slate-500 pt-2 border-t border-slate-100">
           Need a new account?{' '}

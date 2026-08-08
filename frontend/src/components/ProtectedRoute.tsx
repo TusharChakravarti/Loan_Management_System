@@ -32,7 +32,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
         <div className="text-sm font-semibold text-slate-500 animate-pulse">
-          Verifying session authentication...
+          Loading your account...
         </div>
       </div>
     );
