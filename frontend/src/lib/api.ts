@@ -167,91 +167,16 @@ export const loanApi = {
     });
   },
 
-  previewSalarySlip: async (loanId: string, fallbackName?: string): Promise<void> => {
+  previewSalarySlip: async (loanId: string): Promise<void> => {
     const token = getAuthToken();
-    let fileName = fallbackName || `salary-slip-${loanId.slice(-6)}.pdf`;
-
-    // Tier 1: Attempt direct binary stream endpoint
-    try {
-      const response = await fetch(`${API_BASE_URL}/loans/${loanId}/salary-slip/preview`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      if (response.ok) {
-        const disposition = response.headers.get('Content-Disposition');
-        if (disposition && disposition.includes('filename=')) {
-          const match = disposition.match(/filename="?([^";]+)"?/);
-          if (match && match[1]) {
-            fileName = match[1];
-          }
-        }
-
-        const contentType = response.headers.get('Content-Type') || 'application/pdf';
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-
-        const win = window.open('', '_blank');
-        if (win) {
-          win.document.write(`
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <meta charset="utf-8" />
-                <title>${fileName}</title>
-                <style>
-                  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #525659; }
-                  embed, iframe { width: 100%; height: 100%; border: none; }
-                </style>
-              </head>
-              <body>
-                <embed src="${objectUrl}" type="${contentType}" width="100%" height="100%" />
-              </body>
-            </html>
-          `);
-          win.document.close();
-
-          setTimeout(() => {
-            URL.revokeObjectURL(objectUrl);
-          }, 60000);
-          return;
-        }
-      }
-    } catch (streamErr) {
-      console.warn('[Preview Stream] Tier 1 fetch failed, trying Tier 2 fallback...', streamErr);
+    if (!token) {
+      alert('Authentication required to preview document.');
+      return;
     }
 
-    // Tier 2 Fallback: Authenticated Metadata & Cloudinary Document URL Retrieval
-    try {
-      const docRes = await loanApi.getSalarySlipUrl(loanId);
-      if (docRes && docRes.url) {
-        const docName = docRes.originalName || fileName;
-        const win = window.open('', '_blank');
-        if (win) {
-          win.document.write(`
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <meta charset="utf-8" />
-                <title>${docName}</title>
-                <style>
-                  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #525659; }
-                  embed, iframe { width: 100%; height: 100%; border: none; }
-                </style>
-              </head>
-              <body>
-                <embed src="${docRes.url}" type="application/pdf" width="100%" height="100%" />
-              </body>
-            </html>
-          `);
-          win.document.close();
-          return;
-        }
-      }
-    } catch (fallbackErr) {
-      console.error('[Preview Fallback Error]', fallbackErr);
-    }
-
-    alert('Unable to preview salary slip. Please try again.');
+    // Direct native browser streaming with JWT query authentication & inline Content-Disposition title
+    const previewUrl = `${API_BASE_URL}/loans/${loanId}/salary-slip/preview?token=${encodeURIComponent(token)}`;
+    window.open(previewUrl, '_blank', 'noopener,noreferrer');
   },
 
   getSalarySlipUrl: async (loanId: string): Promise<{ url: string; originalName: string }> => {

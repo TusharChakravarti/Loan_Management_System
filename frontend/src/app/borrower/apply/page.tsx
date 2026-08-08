@@ -96,37 +96,14 @@ export default function ApplyLoanPage() {
     }
   };
 
-  // Pre-Submission Local Browser Document Preview Handler (Sets tab title to file.name)
+  // Pre-Submission Local Browser Document Preview Handler
   const handlePreviewDocument = () => {
     if (selectedFile) {
       const objectUrl = URL.createObjectURL(selectedFile);
-      const fileName = selectedFile.name;
-      const fileType = selectedFile.type || 'application/pdf';
-
-      const win = window.open('', '_blank');
-      if (win) {
-        win.document.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta charset="utf-8" />
-              <title>${fileName}</title>
-              <style>
-                html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #525659; }
-                embed, iframe { width: 100%; height: 100%; border: none; }
-              </style>
-            </head>
-            <body>
-              <embed src="${objectUrl}" type="${fileType}" width="100%" height="100%" />
-            </body>
-          </html>
-        `);
-        win.document.close();
-
-        setTimeout(() => {
-          URL.revokeObjectURL(objectUrl);
-        }, 60000);
-      }
+      window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      setTimeout(() => {
+        URL.revokeObjectURL(objectUrl);
+      }, 60000);
     } else {
       alert('No document file selected for preview.');
     }
