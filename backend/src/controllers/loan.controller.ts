@@ -59,6 +59,7 @@ export const checkBREHandler = async (req: Request, res: Response): Promise<void
 /**
  * CLOUDINARY SALARY SLIP UPLOAD HANDLER
  * Streams Multer memory storage file buffer directly to Cloudinary.
+ * Uploads to dedicated folder: loan-management/salary-slips
  * Captures public_id, resource_type, format, and original filename.
  */
 export const uploadSalarySlipHandler = async (req: Request, res: Response): Promise<void> => {
@@ -89,12 +90,12 @@ export const uploadSalarySlipHandler = async (req: Request, res: Response): Prom
       return;
     }
 
-    // Stream Multer memory buffer directly to Cloudinary
+    // Stream Multer memory buffer directly to Cloudinary dedicated folder: loan-management/salary-slips
     const uploadPromise = new Promise<{ secure_url: string; public_id: string; resource_type: string; format: string }>(
       (resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           {
-            folder: 'lms_salary_slips',
+            folder: 'loan-management/salary-slips',
             resource_type: resourceType as any,
             format: isPdf ? 'pdf' : undefined,
           },
@@ -134,7 +135,7 @@ export const uploadSalarySlipHandler = async (req: Request, res: Response): Prom
 
       // Automated integration test mode fallback (when running integration tests with restricted API keys)
       if (process.env.NODE_ENV === 'test' || req.headers['x-test-mode'] === 'true') {
-        const testPublicId = `lms_salary_slips/test-${Date.now()}`;
+        const testPublicId = `loan-management/salary-slips/test-${Date.now()}`;
         const testUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME?.trim() || 'dldmheoht'}/image/upload/v1234567/${testPublicId}.pdf`;
         res.status(200).json({
           success: true,
