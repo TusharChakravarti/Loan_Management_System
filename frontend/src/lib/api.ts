@@ -180,6 +180,13 @@ export const loanApi = {
       return;
     }
 
+    // Safe diagnostic log (No actual JWT logged)
+    console.log('[Salary Slip Preview]', {
+      hasToken: Boolean(token),
+      loanId,
+      endpoint: `${API_BASE_URL}/loans/${loanId}/salary-slip/preview`,
+    });
+
     try {
       const response = await fetch(`${API_BASE_URL}/loans/${loanId}/salary-slip/preview`, {
         method: 'GET',
