@@ -8,6 +8,7 @@ import {
   uploadSalarySlipHandler,
   getSalarySlipFileHandler,
   getLoanSalarySlipDocumentHandler,
+  previewSalarySlipDocumentHandler,
   createLoanHandler,
   getMyLoansHandler,
   getLoanByIdHandler,
@@ -27,7 +28,10 @@ router.post(
   uploadSalarySlipHandler
 );
 
-// Protected secure salary slip document access endpoint (Requires JWT & RBAC authorization in controller)
+// Protected authenticated binary document preview stream endpoint
+router.get('/loans/:id/salary-slip/preview', authenticate, previewSalarySlipDocumentHandler);
+
+// Protected secure salary slip document access metadata endpoint
 router.get('/loans/:id/salary-slip', authenticate, getLoanSalarySlipDocumentHandler);
 
 // Protected legacy static salary slip file serving (Requires JWT auth)

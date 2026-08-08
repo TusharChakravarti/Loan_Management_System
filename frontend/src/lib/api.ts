@@ -152,13 +152,35 @@ export const loanApi = {
 
   uploadSalarySlip: async (
     file: File
-  ): Promise<{ salarySlipUrl: string; salarySlipPublicId?: string; originalName: string }> => {
+  ): Promise<{
+    salarySlipUrl: string;
+    salarySlipPublicId?: string;
+    salarySlipResourceType?: string;
+    salarySlipFormat?: string;
+    originalName: string;
+  }> => {
     const formData = new FormData();
     formData.append('salarySlip', file);
     return await apiFetch('/loans/upload-salary-slip', {
       method: 'POST',
       body: formData,
     });
+  },
+
+  previewSalarySlip: async (loanId: string): Promise<void> => {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/loans/${loanId}/salary-slip/preview`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
+    if (!response.ok) {
+      alert('Unable to preview salary slip. Please try again.');
+      return;
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    window.open(objectUrl, '_blank', 'noopener,noreferrer');
   },
 
   getSalarySlipUrl: async (loanId: string): Promise<{ url: string; originalName: string }> => {

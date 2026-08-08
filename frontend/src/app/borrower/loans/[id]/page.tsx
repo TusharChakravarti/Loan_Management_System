@@ -30,8 +30,7 @@ export default function SingleLoanDetailPage() {
   const handleViewSalarySlip = async (loanId: string) => {
     setFetchingDoc(true);
     try {
-      const res = await loanApi.getSalarySlipUrl(loanId);
-      window.open(res.url, '_blank', 'noopener,noreferrer');
+      await loanApi.previewSalarySlip(loanId);
     } catch (err: any) {
       alert(err.message || 'Failed to retrieve salary slip document');
     } finally {
@@ -50,7 +49,6 @@ export default function SingleLoanDetailPage() {
       case 'DISBURSEMENT_PENDING':
         return 3;
       case 'ACTIVE':
-        // If some repayment made, in stage 5 (Repayment), otherwise stage 4 (Disbursement)
         return outstanding < totalRepayment ? 5 : 4;
       case 'CLOSED':
         return 6;
@@ -266,7 +264,7 @@ export default function SingleLoanDetailPage() {
                         disabled={fetchingDoc}
                         className="font-bold text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-50 text-xs inline-flex items-center gap-1"
                       >
-                        <span>{fetchingDoc ? 'Opening...' : loan.salarySlipOriginalName}</span>
+                        <span>{fetchingDoc ? 'Opening Preview...' : loan.salarySlipOriginalName}</span>
                         <span>↗</span>
                       </button>
                     </div>

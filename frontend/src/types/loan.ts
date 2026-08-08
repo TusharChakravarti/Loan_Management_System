@@ -30,6 +30,9 @@ export interface Loan {
     rejectionReasons: string[];
   };
   salarySlipUrl: string;
+  salarySlipPublicId?: string;
+  salarySlipResourceType?: string;
+  salarySlipFormat?: string;
   salarySlipOriginalName: string;
   loanAmount: number;
   tenureDays: number;
@@ -59,6 +62,9 @@ export interface CreateLoanPayload {
   monthlySalary: number;
   employmentMode: EmploymentMode;
   salarySlipUrl: string;
+  salarySlipPublicId?: string;
+  salarySlipResourceType?: string;
+  salarySlipFormat?: string;
   salarySlipOriginalName: string;
   loanAmount: number;
   tenureDays: number;

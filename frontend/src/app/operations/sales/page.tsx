@@ -57,8 +57,7 @@ export default function SalesDashboardPage() {
   const handleViewSalarySlip = async (loanId: string) => {
     setFetchingDoc(true);
     try {
-      const res = await loanApi.getSalarySlipUrl(loanId);
-      window.open(res.url, '_blank', 'noopener,noreferrer');
+      await loanApi.previewSalarySlip(loanId);
     } catch (err: any) {
       alert(err.message || 'Failed to retrieve salary slip document');
     } finally {

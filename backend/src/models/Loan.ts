@@ -31,6 +31,8 @@ export interface ILoan extends Document {
   };
   salarySlipUrl: string;
   salarySlipPublicId?: string;
+  salarySlipResourceType?: string;
+  salarySlipFormat?: string;
   salarySlipOriginalName: string;
   loanAmount: number;
   tenureDays: number;
@@ -106,6 +108,12 @@ const loanSchema = new Schema<ILoan>(
       required: true,
     },
     salarySlipPublicId: {
+      type: String,
+    },
+    salarySlipResourceType: {
+      type: String,
+    },
+    salarySlipFormat: {
       type: String,
     },
     salarySlipOriginalName: {

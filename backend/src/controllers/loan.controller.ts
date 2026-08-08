@@ -59,7 +59,7 @@ export const checkBREHandler = async (req: Request, res: Response): Promise<void
 /**
  * CLOUDINARY SALARY SLIP UPLOAD HANDLER
  * Streams Multer memory storage file buffer directly to Cloudinary.
- * Logs full technical errors on the server, while returning clean user-facing messaging to the client.
+ * Captures public_id, resource_type, format, and original filename.
  */
 export const uploadSalarySlipHandler = async (req: Request, res: Response): Promise<void> => {
   if (!req.file) {
@@ -70,6 +70,11 @@ export const uploadSalarySlipHandler = async (req: Request, res: Response): Prom
     });
     return;
   }
+
+  const ext = path.extname(req.file.originalname).toLowerCase().replace('.', '');
+  const isPdf = ext === 'pdf';
+  // Use raw resource_type for PDFs to guarantee exact document delivery in Cloudinary
+  const resourceType = isPdf ? 'raw' : 'auto';
 
   try {
     const isCloudinaryReady = getCloudinaryConfig();
@@ -85,35 +90,42 @@ export const uploadSalarySlipHandler = async (req: Request, res: Response): Prom
     }
 
     // Stream Multer memory buffer directly to Cloudinary
-    const uploadPromise = new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: 'lms_salary_slips',
-          resource_type: 'auto',
-        },
-        (error, result) => {
-          if (error || !result) {
-            return reject(error || new Error('Cloudinary upload stream returned empty result'));
+    const uploadPromise = new Promise<{ secure_url: string; public_id: string; resource_type: string; format: string }>(
+      (resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'lms_salary_slips',
+            resource_type: resourceType as any,
+            format: isPdf ? 'pdf' : undefined,
+          },
+          (error, result) => {
+            if (error || !result) {
+              return reject(error || new Error('Cloudinary upload stream returned empty result'));
+            }
+            resolve({
+              secure_url: result.secure_url,
+              public_id: result.public_id,
+              resource_type: result.resource_type || resourceType,
+              format: result.format || ext,
+            });
           }
-          resolve({
-            secure_url: result.secure_url,
-            public_id: result.public_id,
-          });
-        }
-      );
-      uploadStream.end(req.file!.buffer);
-    });
+        );
+        uploadStream.end(req.file!.buffer);
+      }
+    );
 
     try {
       const cloudinaryRes = await uploadPromise;
 
-      console.log(`[Cloudinary Upload Success] Public ID: ${cloudinaryRes.public_id}`);
+      console.log(`[Cloudinary Upload Success] Public ID: ${cloudinaryRes.public_id} | Type: ${cloudinaryRes.resource_type}`);
 
       res.status(200).json({
         success: true,
         message: 'Salary slip uploaded successfully',
         salarySlipUrl: cloudinaryRes.secure_url,
         salarySlipPublicId: cloudinaryRes.public_id,
+        salarySlipResourceType: cloudinaryRes.resource_type,
+        salarySlipFormat: cloudinaryRes.format,
         originalName: req.file.originalname,
       });
       return;
@@ -129,6 +141,8 @@ export const uploadSalarySlipHandler = async (req: Request, res: Response): Prom
           message: 'Salary slip uploaded successfully (Test Mode)',
           salarySlipUrl: testUrl,
           salarySlipPublicId: testPublicId,
+          salarySlipResourceType: 'raw',
+          salarySlipFormat: 'pdf',
           originalName: req.file.originalname,
         });
         return;
@@ -153,8 +167,132 @@ export const uploadSalarySlipHandler = async (req: Request, res: Response): Prom
 };
 
 /**
+ * SECURE SALARY SLIP STREAMING PREVIEW ENDPOINT (GET /api/loans/:id/salary-slip/preview)
+ * Authenticates user, verifies RBAC borrower ownership, fetches binary asset server-side,
+ * and streams it directly to client with Content-Disposition: inline and correct Content-Type.
+ */
+export const previewSalarySlipDocumentHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Authentication token is required',
+      });
+      return;
+    }
+
+    const { id } = req.params;
+    const loan = await Loan.findById(id);
+
+    if (!loan) {
+      res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Loan application not found',
+      });
+      return;
+    }
+
+    const userRole = req.user.role;
+    const userId = req.user.userId;
+
+    // Strict Security & RBAC Isolation:
+    // Borrower can ONLY view their own loan salary slip document.
+    if (userRole === UserRole.BORROWER) {
+      if (loan.borrowerId.toString() !== userId) {
+        res.status(403).json({
+          success: false,
+          error: 'Forbidden',
+          message: "Access denied. You do not have permission to view another borrower's salary slip.",
+        });
+        return;
+      }
+    } else if (userRole === UserRole.SALES || userRole === UserRole.SANCTION || userRole === UserRole.ADMIN) {
+      // Authorized officers
+    } else {
+      // COLLECTION or other unauthorized roles
+      res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        message: 'Your role is not authorized to view salary slip documents',
+      });
+      return;
+    }
+
+    if (!loan.salarySlipUrl) {
+      res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'No salary slip document associated with this loan application',
+      });
+      return;
+    }
+
+    // Infer MIME Content-Type based on original filename / extension
+    const ext = path.extname(loan.salarySlipOriginalName || loan.salarySlipUrl).toLowerCase();
+    let contentType = 'application/pdf';
+    if (ext === '.jpg' || ext === '.jpeg') {
+      contentType = 'image/jpeg';
+    } else if (ext === '.png') {
+      contentType = 'image/png';
+    }
+
+    const fileName = loan.salarySlipOriginalName || `salary-slip-${loan._id}${ext || '.pdf'}`;
+
+    // Set headers for inline browser document rendering
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+
+    // 1. Check if document is stored locally on disk
+    if (loan.salarySlipUrl.startsWith('/uploads/salary-slips/')) {
+      const sanitizedFilename = path.basename(loan.salarySlipUrl);
+      const filePath = path.join(process.cwd(), 'uploads', 'salary-slips', sanitizedFilename);
+
+      if (fs.existsSync(filePath)) {
+        res.sendFile(filePath);
+        return;
+      }
+    }
+
+    // 2. Fetch document from Cloudinary server-side
+    const isCloudinaryReady = getCloudinaryConfig();
+    let targetUrl = loan.salarySlipUrl;
+
+    if (isCloudinaryReady && loan.salarySlipPublicId) {
+      targetUrl = cloudinary.url(loan.salarySlipPublicId, {
+        secure: true,
+        resource_type: (loan.salarySlipResourceType as any) || 'auto',
+        sign_url: true,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+      });
+    }
+
+    const docFetchRes = await fetch(targetUrl);
+    if (!docFetchRes.ok) {
+      console.error(`[Salary Slip Preview] Failed to fetch asset from storage: HTTP ${docFetchRes.status}`);
+      res.status(502).json({
+        success: false,
+        message: 'Unable to preview salary slip. Please try again.',
+      });
+      return;
+    }
+
+    const arrayBuffer = await docFetchRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    res.status(200).send(buffer);
+  } catch (error) {
+    console.error('[Salary Slip Preview] Exception:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Unable to preview salary slip. Please try again.',
+    });
+  }
+};
+
+/**
  * SECURE SALARY SLIP ACCESS API (GET /api/loans/:id/salary-slip)
- * Authenticates user, verifies RBAC authorization, and returns secure document access URL.
+ * Authenticates user, verifies RBAC authorization, and returns secure document metadata & URL.
  */
 export const getLoanSalarySlipDocumentHandler = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -211,11 +349,11 @@ export const getLoanSalarySlipDocumentHandler = async (req: Request, res: Respon
 
     if (isCloudinaryReady && loan.salarySlipPublicId) {
       try {
-        // Cloudinary secure URL
         secureDocumentUrl = cloudinary.url(loan.salarySlipPublicId, {
           secure: true,
+          resource_type: (loan.salarySlipResourceType as any) || 'auto',
           sign_url: true,
-          expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hour temporary access
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
         });
       } catch (err) {
         console.error('[Loan Controller] Cloudinary URL Signing Error:', err);
@@ -308,6 +446,8 @@ export const createLoanHandler = async (req: Request, res: Response): Promise<vo
       employmentMode,
       salarySlipUrl,
       salarySlipPublicId,
+      salarySlipResourceType,
+      salarySlipFormat,
       salarySlipOriginalName,
       loanAmount,
       tenureDays,
@@ -403,6 +543,8 @@ export const createLoanHandler = async (req: Request, res: Response): Promise<vo
       },
       salarySlipUrl,
       salarySlipPublicId,
+      salarySlipResourceType: salarySlipResourceType || 'raw',
+      salarySlipFormat: salarySlipFormat || 'pdf',
       salarySlipOriginalName: salarySlipOriginalName || 'SalarySlip.pdf',
       loanAmount: calcResult.loanAmount,
       tenureDays: calcResult.tenureDays,

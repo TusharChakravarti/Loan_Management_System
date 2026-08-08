@@ -30,6 +30,9 @@ export default function ApplyLoanPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedUrl, setUploadedUrl] = useState<string>('');
+  const [uploadedPublicId, setUploadedPublicId] = useState<string>('');
+  const [uploadedResourceType, setUploadedResourceType] = useState<string>('');
+  const [uploadedFormat, setUploadedFormat] = useState<string>('');
   const [uploadedName, setUploadedName] = useState<string>('');
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -73,7 +76,7 @@ export default function ApplyLoanPage() {
     }
   };
 
-  // Step 3: Handle Salary Slip File Upload
+  // Step 3: Handle Salary Slip File Upload to Cloudinary
   const handleUploadFile = async () => {
     if (!selectedFile) return;
     setUploading(true);
@@ -81,6 +84,9 @@ export default function ApplyLoanPage() {
     try {
       const res = await loanApi.uploadSalarySlip(selectedFile);
       setUploadedUrl(res.salarySlipUrl);
+      setUploadedPublicId(res.salarySlipPublicId || '');
+      setUploadedResourceType(res.salarySlipResourceType || '');
+      setUploadedFormat(res.salarySlipFormat || '');
       setUploadedName(res.originalName || selectedFile.name);
       setStep(4);
     } catch (err: any) {
@@ -90,13 +96,16 @@ export default function ApplyLoanPage() {
     }
   };
 
-  // Secure Document Preview Handler
+  // Pre-Submission Local Browser Document Preview Handler (Using URL.createObjectURL for memory safety)
   const handlePreviewDocument = () => {
-    if (uploadedUrl) {
-      window.open(uploadedUrl, '_blank', 'noopener,noreferrer');
-    } else if (selectedFile) {
-      const tempObjectUrl = URL.createObjectURL(selectedFile);
-      window.open(tempObjectUrl, '_blank', 'noopener,noreferrer');
+    if (selectedFile) {
+      const objectUrl = URL.createObjectURL(selectedFile);
+      window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      setTimeout(() => {
+        URL.revokeObjectURL(objectUrl);
+      }, 60000); // Clean up Object URL after 60s
+    } else {
+      alert('No document file selected for preview.');
     }
   };
 
@@ -112,6 +121,9 @@ export default function ApplyLoanPage() {
         monthlySalary: numericSalary,
         employmentMode,
         salarySlipUrl: uploadedUrl,
+        salarySlipPublicId: uploadedPublicId,
+        salarySlipResourceType: uploadedResourceType,
+        salarySlipFormat: uploadedFormat,
         salarySlipOriginalName: uploadedName || selectedFile?.name || 'SalarySlip.pdf',
         loanAmount,
         tenureDays,
@@ -572,7 +584,7 @@ export default function ApplyLoanPage() {
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div className="space-y-1">
                       <span className="text-xs font-bold text-slate-900 block">
-                        📄 {uploadedName || selectedFile?.name || 'SalarySlip.pdf'}
+                        📄 {selectedFile?.name || uploadedName || 'SalarySlip.pdf'}
                       </span>
                       <div className="flex flex-wrap gap-2 text-[10px]">
                         <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
