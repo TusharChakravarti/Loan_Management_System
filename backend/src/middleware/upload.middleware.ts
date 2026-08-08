@@ -29,7 +29,7 @@ const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFil
     }
   }
 
-  cb(new Error('Invalid file type or mismatched MIME type and file extension. Supported formats: PDF, JPG, JPEG, PNG.'));
+  cb(new Error('INVALID_FILE_TYPE'));
 };
 
 const upload = multer({
@@ -42,23 +42,31 @@ const upload = multer({
 
 export const handleSalarySlipUpload = (req: Request, res: Response, next: NextFunction): void => {
   upload(req, res, (err: any) => {
-    if (err instanceof multer.MulterError) {
-      if (err.code === 'LIMIT_FILE_SIZE') {
+    if (err) {
+      console.error('[Upload Middleware] Multer Upload Exception:', err);
+
+      if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
         res.status(400).json({
-          error: 'File Upload Error',
-          message: 'File size exceeds maximum allowed limit of 5 MB',
+          success: false,
+          error: 'Validation Error',
+          message: 'File size exceeds maximum allowed limit of 5 MB. Please select a smaller file.',
         });
         return;
       }
+
+      if (err.message === 'INVALID_FILE_TYPE') {
+        res.status(400).json({
+          success: false,
+          error: 'Validation Error',
+          message: 'Invalid file type. Only PDF, JPG, JPEG, and PNG files under 5 MB are supported.',
+        });
+        return;
+      }
+
       res.status(400).json({
-        error: 'File Upload Error',
-        message: err.message,
-      });
-      return;
-    } else if (err) {
-      res.status(400).json({
-        error: 'File Upload Error',
-        message: err.message,
+        success: false,
+        error: 'Upload Error',
+        message: 'Unable to upload your salary slip. Please check your file and try again.',
       });
       return;
     }

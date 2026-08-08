@@ -9,25 +9,38 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     // Validation
     if (!fullName || !email || !password || !role) {
-      res.status(400).json({ error: 'Validation Error', message: 'All fields (fullName, email, password, role) are required' });
+      res.status(400).json({
+        success: false,
+        error: 'Validation Error',
+        message: 'All fields (fullName, email, password, role) are required',
+      });
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      res.status(400).json({ error: 'Validation Error', message: 'Invalid email address format' });
+      res.status(400).json({
+        success: false,
+        error: 'Validation Error',
+        message: 'Invalid email address format',
+      });
       return;
     }
 
     if (password.length < 6) {
-      res.status(400).json({ error: 'Validation Error', message: 'Password must be at least 6 characters long' });
+      res.status(400).json({
+        success: false,
+        error: 'Validation Error',
+        message: 'Password must be at least 6 characters long',
+      });
       return;
     }
 
     if (!Object.values(UserRole).includes(role as UserRole)) {
       res.status(400).json({
+        success: false,
         error: 'Validation Error',
-        message: `Invalid role. Must be one of: ${Object.values(UserRole).join(', ')}`,
+        message: `Invalid role selected`,
       });
       return;
     }
@@ -35,7 +48,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     // Check duplicate
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      res.status(409).json({ error: 'Conflict', message: 'Email address is already registered' });
+      res.status(409).json({
+        success: false,
+        error: 'Conflict',
+        message: 'Email address is already registered',
+      });
       return;
     }
 
@@ -55,13 +72,18 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
 
     res.status(201).json({
+      success: true,
       message: 'User registered successfully',
       user: user.toJSON(),
       token,
     });
   } catch (error) {
     console.error('[Auth Controller] Register Error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to register user' });
+    res.status(500).json({
+      success: false,
+      error: 'Registration Error',
+      message: 'Unable to create your account. Please try again.',
+    });
   }
 };
 
@@ -70,20 +92,32 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      res.status(400).json({ error: 'Validation Error', message: 'Email and password are required' });
+      res.status(400).json({
+        success: false,
+        error: 'Validation Error',
+        message: 'Email and password are required',
+      });
       return;
     }
 
     // Find user and explicitly select passwordHash
     const user = await User.findOne({ email: email.toLowerCase() }).select('+passwordHash');
     if (!user) {
-      res.status(401).json({ error: 'Unauthorized', message: 'Invalid email or password' });
+      res.status(401).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Unable to sign in. Please check your credentials and try again.',
+      });
       return;
     }
 
     const isMatch = await comparePassword(password, user.passwordHash);
     if (!isMatch) {
-      res.status(401).json({ error: 'Unauthorized', message: 'Invalid email or password' });
+      res.status(401).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Unable to sign in. Please check your credentials and try again.',
+      });
       return;
     }
 
@@ -94,40 +128,59 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     });
 
     res.status(200).json({
+      success: true,
       message: 'Login successful',
       user: user.toJSON(),
       token,
     });
   } catch (error) {
     console.error('[Auth Controller] Login Error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to authenticate user' });
+    res.status(500).json({
+      success: false,
+      error: 'Authentication Error',
+      message: 'Unable to sign in. Please try again.',
+    });
   }
 };
 
 export const getMe = async (req: Request, res: Response): Promise<void> => {
   try {
     if (!req.user) {
-      res.status(401).json({ error: 'Unauthorized', message: 'Authentication required' });
+      res.status(401).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Authentication required',
+      });
       return;
     }
 
     const user = await User.findById(req.user.userId);
     if (!user) {
-      res.status(404).json({ error: 'Not Found', message: 'User record not found' });
+      res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'User record not found',
+      });
       return;
     }
 
     res.status(200).json({
+      success: true,
       user: user.toJSON(),
     });
   } catch (error) {
     console.error('[Auth Controller] GetMe Error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to retrieve current user' });
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Something went wrong on our end. Please try again later.',
+    });
   }
 };
 
 export const logout = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json({
-    message: 'Logout successful. Client should clear local token storage.',
+    success: true,
+    message: 'Logout successful',
   });
 };

@@ -25,10 +25,14 @@ export const getSalesLoansHandler = async (req: Request, res: Response): Promise
       .populate('borrowerId', 'fullName email')
       .sort({ createdAt: -1 });
 
-    res.status(200).json({ loans });
+    res.status(200).json({ success: true, loans });
   } catch (error) {
     console.error('[Operations Controller] Get Sales Loans Error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch sales loans' });
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Something went wrong on our end. Please try again later.',
+    });
   }
 };
 
@@ -39,7 +43,11 @@ export const reviewSalesLoanHandler = async (req: Request, res: Response): Promi
 
     const loan = await Loan.findById(id);
     if (!loan) {
-      res.status(404).json({ error: 'Not Found', message: 'Loan application not found' });
+      res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Loan application not found',
+      });
       return;
     }
 
@@ -48,7 +56,11 @@ export const reviewSalesLoanHandler = async (req: Request, res: Response): Promi
     try {
       validateStateTransition(loan.status, targetStatus);
     } catch (err: any) {
-      res.status(400).json({ error: 'Invalid Transition', message: err.message });
+      res.status(400).json({
+        success: false,
+        error: 'Invalid Transition',
+        message: 'This state transition is not allowed for the loan application',
+      });
       return;
     }
 
@@ -66,12 +78,17 @@ export const reviewSalesLoanHandler = async (req: Request, res: Response): Promi
     await loan.save();
 
     res.status(200).json({
+      success: true,
       message: action === 'REJECT' ? 'Loan application rejected by Sales' : 'Loan review completed and sent to Sanction',
       loan: loan.toJSON(),
     });
   } catch (error) {
     console.error('[Operations Controller] Review Sales Loan Error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to process Sales review' });
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Something went wrong on our end. Please try again later.',
+    });
   }
 };
 
@@ -85,10 +102,14 @@ export const getSanctionLoansHandler = async (req: Request, res: Response): Prom
       .populate('borrowerId', 'fullName email')
       .sort({ createdAt: -1 });
 
-    res.status(200).json({ loans });
+    res.status(200).json({ success: true, loans });
   } catch (error) {
     console.error('[Operations Controller] Get Sanction Loans Error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch sanction loans' });
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Something went wrong on our end. Please try again later.',
+    });
   }
 };
 
@@ -99,14 +120,22 @@ export const approveSanctionLoanHandler = async (req: Request, res: Response): P
 
     const loan = await Loan.findById(id);
     if (!loan) {
-      res.status(404).json({ error: 'Not Found', message: 'Loan application not found' });
+      res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Loan application not found',
+      });
       return;
     }
 
     try {
       validateStateTransition(loan.status, LoanStatus.DISBURSEMENT_PENDING);
     } catch (err: any) {
-      res.status(400).json({ error: 'Invalid Transition', message: err.message });
+      res.status(400).json({
+        success: false,
+        error: 'Invalid Transition',
+        message: 'This state transition is not allowed for the loan application',
+      });
       return;
     }
 
@@ -118,12 +147,17 @@ export const approveSanctionLoanHandler = async (req: Request, res: Response): P
     await loan.save();
 
     res.status(200).json({
+      success: true,
       message: 'Loan approved by Sanction officer and forwarded to Disbursement',
       loan: loan.toJSON(),
     });
   } catch (error) {
     console.error('[Operations Controller] Approve Sanction Error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to approve sanction' });
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Something went wrong on our end. Please try again later.',
+    });
   }
 };
 
@@ -134,14 +168,22 @@ export const rejectSanctionLoanHandler = async (req: Request, res: Response): Pr
 
     const loan = await Loan.findById(id);
     if (!loan) {
-      res.status(404).json({ error: 'Not Found', message: 'Loan application not found' });
+      res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Loan application not found',
+      });
       return;
     }
 
     try {
       validateStateTransition(loan.status, LoanStatus.REJECTED);
     } catch (err: any) {
-      res.status(400).json({ error: 'Invalid Transition', message: err.message });
+      res.status(400).json({
+        success: false,
+        error: 'Invalid Transition',
+        message: 'This state transition is not allowed for the loan application',
+      });
       return;
     }
 
@@ -153,12 +195,17 @@ export const rejectSanctionLoanHandler = async (req: Request, res: Response): Pr
     await loan.save();
 
     res.status(200).json({
+      success: true,
       message: 'Loan application rejected by Sanction officer',
       loan: loan.toJSON(),
     });
   } catch (error) {
     console.error('[Operations Controller] Reject Sanction Error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to reject sanction' });
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Something went wrong on our end. Please try again later.',
+    });
   }
 };
 
@@ -174,10 +221,14 @@ export const getDisbursementLoansHandler = async (req: Request, res: Response): 
       .populate('borrowerId', 'fullName email')
       .sort({ createdAt: -1 });
 
-    res.status(200).json({ loans });
+    res.status(200).json({ success: true, loans });
   } catch (error) {
     console.error('[Operations Controller] Get Disbursement Loans Error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch disbursement loans' });
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Something went wrong on our end. Please try again later.',
+    });
   }
 };
 
@@ -188,6 +239,7 @@ export const disburseLoanHandler = async (req: Request, res: Response): Promise<
 
     if (!disbursementReference || !disbursementReference.trim()) {
       res.status(400).json({
+        success: false,
         error: 'Validation Error',
         message: 'Disbursement reference number is required',
       });
@@ -196,15 +248,20 @@ export const disburseLoanHandler = async (req: Request, res: Response): Promise<
 
     const loan = await Loan.findById(id);
     if (!loan) {
-      res.status(404).json({ error: 'Not Found', message: 'Loan application not found' });
+      res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Loan application not found',
+      });
       return;
     }
 
     // Duplicate Disbursement Check
     if ([LoanStatus.DISBURSED, LoanStatus.ACTIVE, LoanStatus.CLOSED].includes(loan.status)) {
       res.status(400).json({
+        success: false,
         error: 'Duplicate Disbursement Rejected',
-        message: `Loan is already disbursed (Current Status: ${loan.status}). Duplicate disbursement request rejected.`,
+        message: 'Loan has already been disbursed.',
       });
       return;
     }
@@ -212,7 +269,11 @@ export const disburseLoanHandler = async (req: Request, res: Response): Promise<
     try {
       validateStateTransition(loan.status, LoanStatus.ACTIVE);
     } catch (err: any) {
-      res.status(400).json({ error: 'Invalid Transition', message: err.message });
+      res.status(400).json({
+        success: false,
+        error: 'Invalid Transition',
+        message: 'This state transition is not allowed for the loan application',
+      });
       return;
     }
 
@@ -225,17 +286,22 @@ export const disburseLoanHandler = async (req: Request, res: Response): Promise<
     await loan.save();
 
     res.status(200).json({
+      success: true,
       message: 'Loan disbursed successfully. Loan is now ACTIVE for repayment.',
       loan: loan.toJSON(),
     });
   } catch (error) {
     console.error('[Operations Controller] Disburse Loan Error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to disburse loan' });
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Something went wrong on our end. Please try again later.',
+    });
   }
 };
 
 // ==========================================
-// 4. COLLECTION CONTROLLERS (CONCURRENCY SAFE ATOMIC UPDATES)
+// 4. COLLECTION CONTROLLERS
 // ==========================================
 
 export const getCollectionLoansHandler = async (req: Request, res: Response): Promise<void> => {
@@ -246,10 +312,14 @@ export const getCollectionLoansHandler = async (req: Request, res: Response): Pr
       .populate('borrowerId', 'fullName email')
       .sort({ createdAt: -1 });
 
-    res.status(200).json({ loans });
+    res.status(200).json({ success: true, loans });
   } catch (error) {
     console.error('[Operations Controller] Get Collection Loans Error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch collection loans' });
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Something went wrong on our end. Please try again later.',
+    });
   }
 };
 
@@ -258,7 +328,11 @@ export const getLoanPaymentsHandler = async (req: Request, res: Response): Promi
     const { id } = req.params;
     const loan = await Loan.findById(id).populate('borrowerId', 'fullName email');
     if (!loan) {
-      res.status(404).json({ error: 'Not Found', message: 'Loan not found' });
+      res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Loan not found',
+      });
       return;
     }
 
@@ -266,10 +340,14 @@ export const getLoanPaymentsHandler = async (req: Request, res: Response): Promi
       .populate('recordedBy', 'fullName email role')
       .sort({ createdAt: -1 });
 
-    res.status(200).json({ loan, payments });
+    res.status(200).json({ success: true, loan, payments });
   } catch (error) {
     console.error('[Operations Controller] Get Loan Payments Error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch payment records' });
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Something went wrong on our end. Please try again later.',
+    });
   }
 };
 
@@ -282,6 +360,7 @@ export const recordPaymentHandler = async (req: Request, res: Response): Promise
 
     if (isNaN(paymentAmount) || paymentAmount <= 0) {
       res.status(400).json({
+        success: false,
         error: 'Validation Error',
         message: 'Payment amount must be greater than 0',
       });
@@ -290,13 +369,14 @@ export const recordPaymentHandler = async (req: Request, res: Response): Promise
 
     if (!paymentReference || !paymentReference.trim()) {
       res.status(400).json({
+        success: false,
         error: 'Validation Error',
         message: 'Payment reference transaction ID is required',
       });
       return;
     }
 
-    // Atomic find & update with conditional balance check to prevent concurrent race conditions
+    // Atomic find & update with conditional balance check
     const updatedLoan = await Loan.findOneAndUpdate(
       {
         _id: id,
@@ -327,11 +407,16 @@ export const recordPaymentHandler = async (req: Request, res: Response): Promise
     if (!updatedLoan) {
       const existingLoan = await Loan.findById(id);
       if (!existingLoan) {
-        res.status(404).json({ error: 'Not Found', message: 'Loan not found' });
+        res.status(404).json({
+          success: false,
+          error: 'Not Found',
+          message: 'Loan not found',
+        });
         return;
       }
       if (existingLoan.status === LoanStatus.CLOSED) {
         res.status(400).json({
+          success: false,
           error: 'Invalid Operation',
           message: 'Cannot record payment on an already CLOSED loan',
         });
@@ -339,21 +424,24 @@ export const recordPaymentHandler = async (req: Request, res: Response): Promise
       }
       if (![LoanStatus.DISBURSED, LoanStatus.ACTIVE].includes(existingLoan.status)) {
         res.status(400).json({
+          success: false,
           error: 'Invalid Operation',
-          message: `Cannot record payment for loan in '${existingLoan.status}' status. Loan must be DISBURSED or ACTIVE.`,
+          message: 'Cannot record payment for this loan state',
         });
         return;
       }
       if (paymentAmount > existingLoan.outstandingBalance) {
         res.status(400).json({
+          success: false,
           error: 'Validation Error',
-          message: `Payment amount (₹${paymentAmount}) exceeds current outstanding balance (₹${existingLoan.outstandingBalance})`,
+          message: `Payment amount exceeds current outstanding balance`,
         });
         return;
       }
       res.status(400).json({
+        success: false,
         error: 'Transaction Error',
-        message: 'Payment failed due to concurrent update or balance modification',
+        message: 'Payment processing failed. Please try again.',
       });
       return;
     }
@@ -369,6 +457,7 @@ export const recordPaymentHandler = async (req: Request, res: Response): Promise
     });
 
     res.status(200).json({
+      success: true,
       message:
         updatedLoan.status === LoanStatus.CLOSED
           ? 'Final payment recorded! Loan is now fully CLOSED.'
@@ -378,7 +467,11 @@ export const recordPaymentHandler = async (req: Request, res: Response): Promise
     });
   } catch (error) {
     console.error('[Operations Controller] Record Payment Error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to record payment' });
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Something went wrong on our end. Please try again later.',
+    });
   }
 };
 
@@ -417,6 +510,7 @@ export const getAdminOverviewHandler = async (req: Request, res: Response): Prom
     });
 
     res.status(200).json({
+      success: true,
       counts,
       financials: {
         totalDisbursedAmount: Math.round(totalDisbursedAmount * 100) / 100,
@@ -427,6 +521,10 @@ export const getAdminOverviewHandler = async (req: Request, res: Response): Prom
     });
   } catch (error) {
     console.error('[Operations Controller] Admin Overview Error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch admin overview' });
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Something went wrong on our end. Please try again later.',
+    });
   }
 };

@@ -1,4 +1,4 @@
-import express, { Express, Request, Response } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
@@ -35,6 +35,19 @@ app.get('/', (req: Request, res: Response) => {
     auth: '/api/auth',
     loans: '/api/loans',
     operations: '/api/operations',
+  });
+});
+
+// Centralized Express Global Error Handler (Sanitizes all unhandled server exceptions)
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+  // 1. Log full technical details & stack trace server-side ONLY for developers
+  console.error('[Global Error Handler] Server Exception:', err);
+
+  // 2. Return safe, user-friendly JSON response to client
+  const statusCode = err.statusCode || err.status || 500;
+  res.status(statusCode).json({
+    success: false,
+    message: 'Something went wrong on our end. Please try again later.',
   });
 });
 

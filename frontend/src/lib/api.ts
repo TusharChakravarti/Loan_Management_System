@@ -28,6 +28,30 @@ export const setAuthToken = (token: string | null): void => {
   }
 };
 
+const isTechnicalErrorMessage = (msg: string): boolean => {
+  if (!msg || typeof msg !== 'string') return true;
+  const technicalKeywords = [
+    'cloudinary',
+    'mongodb',
+    'mongoose',
+    'jwt_secret',
+    'api_key',
+    'api_secret',
+    'actions=',
+    'node_modules',
+    '.env',
+    'typeerror',
+    'referenceerror',
+    'syntaxerror',
+    'eaddrinuse',
+    'econnrefused',
+    'unexpectedresponse',
+    'http_code',
+  ];
+  const lower = msg.toLowerCase();
+  return technicalKeywords.some((kw) => lower.includes(kw));
+};
+
 export const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<any> => {
   const token = getAuthToken();
   const headers: Record<string, string> = {
@@ -50,8 +74,23 @@ export const apiFetch = async (endpoint: string, options: RequestInit = {}): Pro
   const data = await response.json();
 
   if (!response.ok) {
-    const errorMsg = data.message || data.error || 'API Request Failed';
-    const err = new Error(errorMsg) as any;
+    let rawMsg = data.message || data.error;
+
+    if (isTechnicalErrorMessage(rawMsg)) {
+      if (endpoint.includes('upload-salary-slip')) {
+        rawMsg = 'Unable to upload your salary slip. Please try again.';
+      } else if (endpoint.includes('salary-slip')) {
+        rawMsg = 'Unable to retrieve the document. Please try again.';
+      } else if (endpoint.includes('/auth/login')) {
+        rawMsg = 'Unable to sign in. Please check your credentials and try again.';
+      } else if (endpoint.includes('/auth/register')) {
+        rawMsg = 'Unable to create your account. Please try again.';
+      } else {
+        rawMsg = 'Something went wrong on our end. Please try again later.';
+      }
+    }
+
+    const err = new Error(rawMsg) as any;
     err.rejectionReasons = data.rejectionReasons;
     err.status = response.status;
     throw err;
