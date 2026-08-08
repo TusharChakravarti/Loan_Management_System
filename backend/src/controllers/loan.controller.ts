@@ -169,7 +169,7 @@ export const uploadSalarySlipHandler = async (req: Request, res: Response): Prom
 /**
  * SECURE SALARY SLIP STREAMING PREVIEW ENDPOINT (GET /api/loans/:id/salary-slip/preview)
  * Authenticates user via Bearer token, verifies RBAC borrower ownership, fetches binary asset server-side,
- * validates PDF magic bytes, and streams it directly to client with Content-Disposition: inline.
+ * validates Content-Type and PDF magic bytes (%PDF-), and streams it directly to client with Content-Disposition: inline.
  */
 export const previewSalarySlipDocumentHandler = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -255,12 +255,12 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
       }
     }
 
-    // 2. Server-side fetch from stored Cloudinary URL
+    // 2. Server-side fetch from stored Cloudinary URL directly
     const targetUrl = loan.salarySlipUrl;
     const docFetchRes = await fetch(targetUrl);
 
     if (!docFetchRes.ok) {
-      console.error('[Salary Slip Preview] Cloudinary fetch failed:', {
+      console.error('[Salary Slip Preview] Storage fetch failed:', {
         status: docFetchRes.status,
         contentType: docFetchRes.headers.get('content-type'),
       });
@@ -271,7 +271,20 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
       return;
     }
 
-    // 3. Read binary buffer and validate PDF signature
+    // 3. Validate Cloudinary Content-Type (Reject HTML error pages, JSON, XML)
+    const fetchedContentType = docFetchRes.headers.get('content-type') || '';
+    if (isPdf && (fetchedContentType.includes('text/html') || fetchedContentType.includes('application/json') || fetchedContentType.includes('text/plain'))) {
+      console.error('[Salary Slip Preview] Non-PDF Content-Type received from storage:', {
+        contentType: fetchedContentType,
+      });
+      res.status(502).json({
+        success: false,
+        message: 'Unable to preview salary slip. Please try again.',
+      });
+      return;
+    }
+
+    // 4. Read binary buffer and validate PDF magic bytes (%PDF-)
     const arrayBuffer = await docFetchRes.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
@@ -284,24 +297,32 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
       return;
     }
 
-    if (isPdf && buffer.length >= 5) {
-      const pdfHeader = buffer.subarray(0, 5).toString('utf-8');
-      if (pdfHeader !== '%PDF-') {
-        console.error('[Salary Slip Preview] Invalid PDF response:', {
-          status: docFetchRes.status,
-          contentType: docFetchRes.headers.get('content-type'),
-          contentLength: buffer.length,
-          firstBytes: buffer.subarray(0, 20).toString(),
-        });
-        res.status(502).json({
-          success: false,
-          message: 'Unable to preview salary slip. Please try again.',
-        });
-        return;
-      }
+    const isPdfMagic = buffer.length >= 5 && buffer.subarray(0, 5).toString('utf-8') === '%PDF-';
+
+    // Safe backend debug log (No tokens, secrets, or full URIs)
+    console.log('[Salary Slip Preview]', {
+      status: docFetchRes.status,
+      contentType: fetchedContentType,
+      contentLength: buffer.length,
+      resourceType: loan.salarySlipResourceType,
+      format: loan.salarySlipFormat,
+      isPdfMagic,
+    });
+
+    if (isPdf && !isPdfMagic) {
+      console.error('[Salary Slip Preview] Invalid PDF binary signature:', {
+        contentType: fetchedContentType,
+        contentLength: buffer.length,
+        firstBytes: buffer.subarray(0, 20).toString('utf-8'),
+      });
+      res.status(502).json({
+        success: false,
+        message: 'Unable to preview salary slip. Please try again.',
+      });
+      return;
     }
 
-    // 4. Set headers and stream binary
+    // 5. Set headers and stream binary response
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
     res.setHeader('Content-Length', buffer.length.toString());
