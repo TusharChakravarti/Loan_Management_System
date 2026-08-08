@@ -99,10 +99,32 @@ export default function ApplyLoanPage() {
   // Pre-Submission Local Browser Document Preview Handler
   const handlePreviewDocument = () => {
     if (selectedFile) {
-      const objectUrl = URL.createObjectURL(selectedFile);
-      window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      const pdfBlobUrl = URL.createObjectURL(selectedFile);
+      const fileName = selectedFile.name;
+
+      const htmlContent = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${fileName}</title>
+    <style>
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #525659; }
+      iframe { width: 100%; height: 100%; border: none; }
+    </style>
+  </head>
+  <body>
+    <iframe src="${pdfBlobUrl}"></iframe>
+  </body>
+</html>`;
+
+      const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+      const htmlBlobUrl = URL.createObjectURL(htmlBlob);
+
+      window.open(htmlBlobUrl, '_blank', 'noopener,noreferrer');
+
       setTimeout(() => {
-        URL.revokeObjectURL(objectUrl);
+        URL.revokeObjectURL(htmlBlobUrl);
+        URL.revokeObjectURL(pdfBlobUrl);
       }, 60000);
     } else {
       alert('No document file selected for preview.');

@@ -168,8 +168,8 @@ export const uploadSalarySlipHandler = async (req: Request, res: Response): Prom
 
 /**
  * SECURE SALARY SLIP STREAMING PREVIEW ENDPOINT (GET /api/loans/:id/salary-slip/preview)
- * Authenticates user, verifies RBAC borrower ownership, fetches binary asset server-side,
- * and streams it directly to client with Content-Disposition: inline and correct Content-Type.
+ * Authenticates user via Bearer token, verifies RBAC borrower ownership, fetches binary asset server-side,
+ * validates PDF magic bytes, and streams it directly to client with Content-Disposition: inline.
  */
 export const previewSalarySlipDocumentHandler = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -231,6 +231,7 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
 
     // Infer MIME Content-Type based on original filename / extension
     const ext = path.extname(loan.salarySlipOriginalName || loan.salarySlipUrl).toLowerCase();
+    const isPdf = ext === '.pdf' || !ext;
     let contentType = 'application/pdf';
     if (ext === '.jpg' || ext === '.jpeg') {
       contentType = 'image/jpeg';
@@ -240,50 +241,29 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
 
     const fileName = loan.salarySlipOriginalName || `salary-slip-${loan._id}${ext || '.pdf'}`;
 
-    // Set headers for inline browser document rendering & expose Content-Disposition for CORS clients
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-
     // 1. Check if document is stored locally on disk (Legacy records only)
     if (loan.salarySlipUrl.startsWith('/uploads/salary-slips/')) {
       const sanitizedFilename = path.basename(loan.salarySlipUrl);
       const filePath = path.join(process.cwd(), 'uploads', 'salary-slips', sanitizedFilename);
 
       if (fs.existsSync(filePath)) {
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
         res.sendFile(filePath);
         return;
       }
     }
 
-    // 2. Fetch document from Cloudinary server-side with fallback
-    const isCloudinaryReady = getCloudinaryConfig();
-    let targetUrl = loan.salarySlipUrl;
-
-    if (isCloudinaryReady && loan.salarySlipPublicId) {
-      try {
-        targetUrl = cloudinary.url(loan.salarySlipPublicId, {
-          secure: true,
-          resource_type: (loan.salarySlipResourceType as any) || 'auto',
-          sign_url: true,
-          expires_at: Math.floor(Date.now() / 1000) + 3600,
-        });
-      } catch (err) {
-        console.warn('[Salary Slip Preview] Cloudinary URL signing error:', err);
-        targetUrl = loan.salarySlipUrl;
-      }
-    }
-
-    let docFetchRes = await fetch(targetUrl);
-
-    // If signed URL fetch returned a non-200 status (e.g. 403/404 on signed raw files), fallback to stored secureUrl
-    if (!docFetchRes.ok && targetUrl !== loan.salarySlipUrl) {
-      console.warn(`[Salary Slip Preview] Signed URL fetch returned HTTP ${docFetchRes.status}, falling back to stored secureUrl...`);
-      docFetchRes = await fetch(loan.salarySlipUrl);
-    }
+    // 2. Server-side fetch from stored Cloudinary URL
+    const targetUrl = loan.salarySlipUrl;
+    const docFetchRes = await fetch(targetUrl);
 
     if (!docFetchRes.ok) {
-      console.error(`[Salary Slip Preview] Failed to fetch asset from storage: HTTP ${docFetchRes.status}`);
+      console.error('[Salary Slip Preview] Cloudinary fetch failed:', {
+        status: docFetchRes.status,
+        contentType: docFetchRes.headers.get('content-type'),
+      });
       res.status(502).json({
         success: false,
         message: 'Unable to preview salary slip. Please try again.',
@@ -291,8 +271,41 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
       return;
     }
 
+    // 3. Read binary buffer and validate PDF signature
     const arrayBuffer = await docFetchRes.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
+    if (buffer.length === 0) {
+      console.error('[Salary Slip Preview] Received 0-byte document from Cloudinary storage');
+      res.status(502).json({
+        success: false,
+        message: 'Unable to preview salary slip. Please try again.',
+      });
+      return;
+    }
+
+    if (isPdf && buffer.length >= 5) {
+      const pdfHeader = buffer.subarray(0, 5).toString('utf-8');
+      if (pdfHeader !== '%PDF-') {
+        console.error('[Salary Slip Preview] Invalid PDF response:', {
+          status: docFetchRes.status,
+          contentType: docFetchRes.headers.get('content-type'),
+          contentLength: buffer.length,
+          firstBytes: buffer.subarray(0, 20).toString(),
+        });
+        res.status(502).json({
+          success: false,
+          message: 'Unable to preview salary slip. Please try again.',
+        });
+        return;
+      }
+    }
+
+    // 4. Set headers and stream binary
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    res.setHeader('Content-Length', buffer.length.toString());
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
     res.status(200).send(buffer);
   } catch (error) {
     console.error('[Salary Slip Preview] Exception:', error);

@@ -167,6 +167,12 @@ export const loanApi = {
     });
   },
 
+  /**
+   * AUTHENTICATED BINARY DOCUMENT PREVIEW HANDLER
+   * Sends Authorization: Bearer <token> header to backend streaming endpoint.
+   * Parses Content-Disposition header for original filename, validates binary blob,
+   * and renders preview in a new browser tab with document title preserved.
+   */
   previewSalarySlip: async (loanId: string): Promise<void> => {
     const token = getAuthToken();
     if (!token) {
@@ -174,9 +180,68 @@ export const loanApi = {
       return;
     }
 
-    // Direct native browser streaming with JWT query authentication & inline Content-Disposition title
-    const previewUrl = `${API_BASE_URL}/loans/${loanId}/salary-slip/preview?token=${encodeURIComponent(token)}`;
-    window.open(previewUrl, '_blank', 'noopener,noreferrer');
+    try {
+      const response = await fetch(`${API_BASE_URL}/loans/${loanId}/salary-slip/preview`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        alert('Unable to preview salary slip. Please try again.');
+        return;
+      }
+
+      // Extract filename from Content-Disposition header
+      let fileName = `Salary_Slip_${loanId.slice(-6)}.pdf`;
+      const disposition = response.headers.get('Content-Disposition');
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) {
+          fileName = match[1];
+        }
+      }
+
+      const blob = await response.blob();
+
+      // Validate blob size & type
+      if (!blob || blob.size === 0) {
+        alert('Unable to preview salary slip. Please try again.');
+        return;
+      }
+
+      const pdfBlobUrl = URL.createObjectURL(blob);
+
+      // Create an HTML Blob wrapper page setting document title and embedding iframe
+      const htmlContent = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${fileName}</title>
+    <style>
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #525659; }
+      iframe { width: 100%; height: 100%; border: none; }
+    </style>
+  </head>
+  <body>
+    <iframe src="${pdfBlobUrl}"></iframe>
+  </body>
+</html>`;
+
+      const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+      const htmlBlobUrl = URL.createObjectURL(htmlBlob);
+
+      window.open(htmlBlobUrl, '_blank', 'noopener,noreferrer');
+
+      setTimeout(() => {
+        URL.revokeObjectURL(htmlBlobUrl);
+        URL.revokeObjectURL(pdfBlobUrl);
+      }, 60000);
+    } catch (err: any) {
+      console.error('[Document Preview Exception]', err);
+      alert('Unable to preview salary slip. Please try again.');
+    }
   },
 
   getSalarySlipUrl: async (loanId: string): Promise<{ url: string; originalName: string }> => {
