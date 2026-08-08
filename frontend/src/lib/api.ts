@@ -1,0 +1,201 @@
+import { AuthResponse, LoginPayload, RegisterPayload, User } from '../types/auth';
+import { BREResult, CreateLoanPayload, Loan } from '../types/loan';
+import {
+  AdminOverview,
+  DisbursementPayload,
+  Payment,
+  RecordPaymentPayload,
+  SalesReviewPayload,
+  SanctionPayload,
+} from '../types/operations';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
+
+export const getAuthToken = (): string | null => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('lms_auth_token');
+  }
+  return null;
+};
+
+export const setAuthToken = (token: string | null): void => {
+  if (typeof window !== 'undefined') {
+    if (token) {
+      localStorage.setItem('lms_auth_token', token);
+    } else {
+      localStorage.removeItem('lms_auth_token');
+    }
+  }
+};
+
+export const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<any> => {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const errorMsg = data.message || data.error || 'API Request Failed';
+    const err = new Error(errorMsg) as any;
+    err.rejectionReasons = data.rejectionReasons;
+    err.status = response.status;
+    throw err;
+  }
+
+  return data;
+};
+
+export const authApi = {
+  login: async (payload: LoginPayload): Promise<AuthResponse> => {
+    const data = await apiFetch('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    setAuthToken(data.token);
+    return data;
+  },
+
+  register: async (payload: RegisterPayload): Promise<AuthResponse> => {
+    const data = await apiFetch('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    setAuthToken(data.token);
+    return data;
+  },
+
+  getMe: async (): Promise<{ user: User }> => {
+    return await apiFetch('/auth/me');
+  },
+
+  logout: async (): Promise<void> => {
+    try {
+      await apiFetch('/auth/logout', { method: 'POST' });
+    } catch {
+      // Ignore network errors on logout
+    } finally {
+      setAuthToken(null);
+    }
+  },
+
+  testEndpoint: async (path: string): Promise<any> => {
+    return await apiFetch(`/test/${path}`);
+  },
+};
+
+export const loanApi = {
+  checkBRE: async (payload: {
+    dateOfBirth: string;
+    monthlySalary: number;
+    pan: string;
+    employmentMode: string;
+  }): Promise<BREResult> => {
+    return await apiFetch('/loans/bre/check', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  uploadSalarySlip: async (file: File): Promise<{ salarySlipUrl: string; originalName: string }> => {
+    const formData = new FormData();
+    formData.append('salarySlip', file);
+    return await apiFetch('/loans/upload-salary-slip', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  createLoan: async (payload: CreateLoanPayload): Promise<{ message: string; loan: Loan }> => {
+    return await apiFetch('/loans', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getMyLoans: async (): Promise<{ loans: Loan[] }> => {
+    return await apiFetch('/loans/my');
+  },
+
+  getLoanById: async (id: string): Promise<{ loan: Loan }> => {
+    return await apiFetch(`/loans/${id}`);
+  },
+};
+
+export const operationsApi = {
+  // Sales
+  getSalesLoans: async (status?: string): Promise<{ loans: Loan[] }> => {
+    const query = status ? `?status=${status}` : '';
+    return await apiFetch(`/operations/sales/loans${query}`);
+  },
+  reviewSalesLoan: async (id: string, payload: SalesReviewPayload): Promise<{ message: string; loan: Loan }> => {
+    return await apiFetch(`/operations/sales/loans/${id}/review`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Sanction
+  getSanctionLoans: async (): Promise<{ loans: Loan[] }> => {
+    return await apiFetch('/operations/sanction/loans');
+  },
+  approveSanctionLoan: async (id: string, payload: SanctionPayload): Promise<{ message: string; loan: Loan }> => {
+    return await apiFetch(`/operations/sanction/loans/${id}/approve`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  rejectSanctionLoan: async (id: string, payload: SanctionPayload): Promise<{ message: string; loan: Loan }> => {
+    return await apiFetch(`/operations/sanction/loans/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Disbursement
+  getDisbursementLoans: async (): Promise<{ loans: Loan[] }> => {
+    return await apiFetch('/operations/disbursement/loans');
+  },
+  disburseLoan: async (id: string, payload: DisbursementPayload): Promise<{ message: string; loan: Loan }> => {
+    return await apiFetch(`/operations/disbursement/loans/${id}/disburse`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Collection
+  getCollectionLoans: async (): Promise<{ loans: Loan[] }> => {
+    return await apiFetch('/operations/collection/loans');
+  },
+  getLoanPayments: async (id: string): Promise<{ loan: Loan; payments: Payment[] }> => {
+    return await apiFetch(`/operations/collection/loans/${id}`);
+  },
+  recordPayment: async (
+    id: string,
+    payload: RecordPaymentPayload
+  ): Promise<{ message: string; loan: Loan; payment: Payment }> => {
+    return await apiFetch(`/operations/collection/loans/${id}/payments`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Admin Overview
+  getAdminOverview: async (): Promise<AdminOverview> => {
+    return await apiFetch('/operations/admin/overview');
+  },
+};
