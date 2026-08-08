@@ -256,20 +256,32 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
       }
     }
 
-    // 2. Fetch document from Cloudinary server-side
+    // 2. Fetch document from Cloudinary server-side with fallback
     const isCloudinaryReady = getCloudinaryConfig();
     let targetUrl = loan.salarySlipUrl;
 
     if (isCloudinaryReady && loan.salarySlipPublicId) {
-      targetUrl = cloudinary.url(loan.salarySlipPublicId, {
-        secure: true,
-        resource_type: (loan.salarySlipResourceType as any) || 'auto',
-        sign_url: true,
-        expires_at: Math.floor(Date.now() / 1000) + 3600,
-      });
+      try {
+        targetUrl = cloudinary.url(loan.salarySlipPublicId, {
+          secure: true,
+          resource_type: (loan.salarySlipResourceType as any) || 'auto',
+          sign_url: true,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+        });
+      } catch (err) {
+        console.warn('[Salary Slip Preview] Cloudinary URL signing error:', err);
+        targetUrl = loan.salarySlipUrl;
+      }
     }
 
-    const docFetchRes = await fetch(targetUrl);
+    let docFetchRes = await fetch(targetUrl);
+
+    // If signed URL fetch returned a non-200 status (e.g. 403/404 on signed raw files), fallback to stored secureUrl
+    if (!docFetchRes.ok && targetUrl !== loan.salarySlipUrl) {
+      console.warn(`[Salary Slip Preview] Signed URL fetch returned HTTP ${docFetchRes.status}, falling back to stored secureUrl...`);
+      docFetchRes = await fetch(loan.salarySlipUrl);
+    }
+
     if (!docFetchRes.ok) {
       console.error(`[Salary Slip Preview] Failed to fetch asset from storage: HTTP ${docFetchRes.status}`);
       res.status(502).json({
