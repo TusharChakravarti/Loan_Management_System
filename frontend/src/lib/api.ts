@@ -111,13 +111,19 @@ export const loanApi = {
     });
   },
 
-  uploadSalarySlip: async (file: File): Promise<{ salarySlipUrl: string; originalName: string }> => {
+  uploadSalarySlip: async (
+    file: File
+  ): Promise<{ salarySlipUrl: string; salarySlipPublicId?: string; originalName: string }> => {
     const formData = new FormData();
     formData.append('salarySlip', file);
     return await apiFetch('/loans/upload-salary-slip', {
       method: 'POST',
       body: formData,
     });
+  },
+
+  getSalarySlipUrl: async (loanId: string): Promise<{ url: string; originalName: string }> => {
+    return await apiFetch(`/loans/${loanId}/salary-slip`);
   },
 
   createLoan: async (payload: CreateLoanPayload): Promise<{ message: string; loan: Loan }> => {

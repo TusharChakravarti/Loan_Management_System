@@ -7,6 +7,7 @@ import {
   checkBREHandler,
   uploadSalarySlipHandler,
   getSalarySlipFileHandler,
+  getLoanSalarySlipDocumentHandler,
   createLoanHandler,
   getMyLoansHandler,
   getLoanByIdHandler,
@@ -26,7 +27,10 @@ router.post(
   uploadSalarySlipHandler
 );
 
-// Protected salary slip file serving (Requires JWT auth & ownership / ops check)
+// Protected secure salary slip document access endpoint (Requires JWT & RBAC authorization in controller)
+router.get('/loans/:id/salary-slip', authenticate, getLoanSalarySlipDocumentHandler);
+
+// Protected legacy static salary slip file serving (Requires JWT auth)
 router.get('/uploads/salary-slips/:filename', authenticate, getSalarySlipFileHandler);
 
 // Create loan application (BORROWER only)

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
 import { OperationsNav } from '../../../components/OperationsNav';
-import { operationsApi } from '../../../lib/api';
+import { operationsApi, loanApi } from '../../../lib/api';
 import { Loan } from '../../../types/loan';
 
 export default function SanctionDashboardPage() {
@@ -15,6 +15,7 @@ export default function SanctionDashboardPage() {
   const [remarks, setRemarks] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [fetchingDoc, setFetchingDoc] = useState<boolean>(false);
 
   const fetchLoans = async () => {
     setLoading(true);
@@ -52,6 +53,18 @@ export default function SanctionDashboardPage() {
       alert(err.message || 'Failed to execute Sanction action');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleViewSalarySlip = async (loanId: string) => {
+    setFetchingDoc(true);
+    try {
+      const res = await loanApi.getSalarySlipUrl(loanId);
+      window.open(res.url, '_blank', 'noopener,noreferrer');
+    } catch (err: any) {
+      alert(err.message || 'Failed to retrieve salary slip document');
+    } finally {
+      setFetchingDoc(false);
     }
   };
 
@@ -178,14 +191,13 @@ export default function SanctionDashboardPage() {
 
                 <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium rounded-lg flex justify-between items-center">
                   <span>BRE Status: <strong>PASSED</strong></span>
-                  <a
-                    href={`http://localhost:5000${selectedLoan.salarySlipUrl}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-bold text-blue-600 underline"
+                  <button
+                    onClick={() => handleViewSalarySlip(selectedLoan._id)}
+                    disabled={fetchingDoc}
+                    className="font-bold text-blue-600 hover:text-blue-800 underline disabled:opacity-50"
                   >
-                    Inspect Salary Slip ↗
-                  </a>
+                    {fetchingDoc ? 'Opening Document...' : 'Inspect Salary Slip ↗'}
+                  </button>
                 </div>
 
                 <div className="space-y-2">

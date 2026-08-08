@@ -14,6 +14,7 @@ export default function SingleLoanDetailPage() {
   const [loan, setLoan] = useState<Loan | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [fetchingDoc, setFetchingDoc] = useState<boolean>(false);
 
   useEffect(() => {
     if (id) {
@@ -24,6 +25,18 @@ export default function SingleLoanDetailPage() {
         .finally(() => setLoading(false));
     }
   }, [id]);
+
+  const handleViewSalarySlip = async (loanId: string) => {
+    setFetchingDoc(true);
+    try {
+      const res = await loanApi.getSalarySlipUrl(loanId);
+      window.open(res.url, '_blank', 'noopener,noreferrer');
+    } catch (err: any) {
+      alert(err.message || 'Failed to retrieve salary slip document');
+    } finally {
+      setFetchingDoc(false);
+    }
+  };
 
   return (
     <ProtectedRoute allowedRoles={['BORROWER']}>
@@ -41,7 +54,7 @@ export default function SingleLoanDetailPage() {
             </div>
             {loan && (
               <span
-                className={`px-3 py-1 rounded.full text-xs font-mono font-bold uppercase tracking-wider ${
+                className={`px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider ${
                   loan.status === 'PENDING'
                     ? 'bg-amber-100 text-amber-800 border border-amber-300'
                     : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
@@ -147,16 +160,15 @@ export default function SingleLoanDetailPage() {
                       <span className="text-slate-500">Employment Mode</span>
                       <span className="font-bold text-slate-800">{loan.employmentMode}</span>
                     </div>
-                    <div className="flex justify-between py-1">
+                    <div className="flex justify-between py-1 items-center">
                       <span className="text-slate-500">Salary Slip Document</span>
-                      <a
-                        href={`http://localhost:5000${loan.salarySlipUrl}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-bold text-blue-600 hover:underline"
+                      <button
+                        onClick={() => handleViewSalarySlip(loan._id)}
+                        disabled={fetchingDoc}
+                        className="font-bold text-blue-600 hover:underline disabled:opacity-50 text-xs"
                       >
-                        {loan.salarySlipOriginalName}
-                      </a>
+                        {fetchingDoc ? 'Opening...' : `${loan.salarySlipOriginalName} ↗`}
+                      </button>
                     </div>
                   </div>
                 </div>
