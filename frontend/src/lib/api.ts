@@ -169,53 +169,89 @@ export const loanApi = {
 
   previewSalarySlip: async (loanId: string, fallbackName?: string): Promise<void> => {
     const token = getAuthToken();
-    const response = await fetch(`${API_BASE_URL}/loans/${loanId}/salary-slip/preview`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-
-    if (!response.ok) {
-      alert('Unable to preview salary slip. Please try again.');
-      return;
-    }
-
-    // Extract filename from Content-Disposition header
     let fileName = fallbackName || `salary-slip-${loanId.slice(-6)}.pdf`;
-    const disposition = response.headers.get('Content-Disposition');
-    if (disposition && disposition.includes('filename=')) {
-      const match = disposition.match(/filename="?([^";]+)"?/);
-      if (match && match[1]) {
-        fileName = match[1];
+
+    // Tier 1: Attempt direct binary stream endpoint
+    try {
+      const response = await fetch(`${API_BASE_URL}/loans/${loanId}/salary-slip/preview`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (response.ok) {
+        const disposition = response.headers.get('Content-Disposition');
+        if (disposition && disposition.includes('filename=')) {
+          const match = disposition.match(/filename="?([^";]+)"?/);
+          if (match && match[1]) {
+            fileName = match[1];
+          }
+        }
+
+        const contentType = response.headers.get('Content-Type') || 'application/pdf';
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+
+        const win = window.open('', '_blank');
+        if (win) {
+          win.document.write(`
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta charset="utf-8" />
+                <title>${fileName}</title>
+                <style>
+                  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #525659; }
+                  embed, iframe { width: 100%; height: 100%; border: none; }
+                </style>
+              </head>
+              <body>
+                <embed src="${objectUrl}" type="${contentType}" width="100%" height="100%" />
+              </body>
+            </html>
+          `);
+          win.document.close();
+
+          setTimeout(() => {
+            URL.revokeObjectURL(objectUrl);
+          }, 60000);
+          return;
+        }
       }
+    } catch (streamErr) {
+      console.warn('[Preview Stream] Tier 1 fetch failed, trying Tier 2 fallback...', streamErr);
     }
 
-    const contentType = response.headers.get('Content-Type') || 'application/pdf';
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
-
-    const win = window.open('', '_blank');
-    if (win) {
-      win.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8" />
-            <title>${fileName}</title>
-            <style>
-              html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #525659; }
-              embed, iframe { width: 100%; height: 100%; border: none; }
-            </style>
-          </head>
-          <body>
-            <embed src="${objectUrl}" type="${contentType}" width="100%" height="100%" />
-          </body>
-        </html>
-      `);
-      win.document.close();
-
-      setTimeout(() => {
-        URL.revokeObjectURL(objectUrl);
-      }, 60000);
+    // Tier 2 Fallback: Authenticated Metadata & Cloudinary Document URL Retrieval
+    try {
+      const docRes = await loanApi.getSalarySlipUrl(loanId);
+      if (docRes && docRes.url) {
+        const docName = docRes.originalName || fileName;
+        const win = window.open('', '_blank');
+        if (win) {
+          win.document.write(`
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta charset="utf-8" />
+                <title>${docName}</title>
+                <style>
+                  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #525659; }
+                  embed, iframe { width: 100%; height: 100%; border: none; }
+                </style>
+              </head>
+              <body>
+                <embed src="${docRes.url}" type="application/pdf" width="100%" height="100%" />
+              </body>
+            </html>
+          `);
+          win.document.close();
+          return;
+        }
+      }
+    } catch (fallbackErr) {
+      console.error('[Preview Fallback Error]', fallbackErr);
     }
+
+    alert('Unable to preview salary slip. Please try again.');
   },
 
   getSalarySlipUrl: async (loanId: string): Promise<{ url: string; originalName: string }> => {
