@@ -7,21 +7,23 @@ import { calculateLoan } from '../services/loan-calc.service.js';
 import { Loan, LoanStatus, EmploymentMode } from '../models/Loan.js';
 import { UserRole } from '../models/User.js';
 
-// Configure Cloudinary if environment variables exist
-const isCloudinaryConfigured = Boolean(
-  process.env.CLOUDINARY_CLOUD_NAME &&
-  process.env.CLOUDINARY_API_KEY &&
-  process.env.CLOUDINARY_API_SECRET
-);
+// Configure Cloudinary dynamically with trimmed credentials
+const getCloudinaryConfig = () => {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
+  const apiKey = process.env.CLOUDINARY_API_KEY?.trim();
+  const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
 
-if (isCloudinaryConfigured) {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-    secure: true,
-  });
-}
+  if (cloudName && apiKey && apiSecret) {
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+      secure: true,
+    });
+    return true;
+  }
+  return false;
+};
 
 export const checkBREHandler = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -49,66 +51,90 @@ export const checkBREHandler = async (req: Request, res: Response): Promise<void
   }
 };
 
+/**
+ * CLOUDINARY SALARY SLIP UPLOAD HANDLER
+ * Streams Multer memory storage file buffer directly to Cloudinary folder 'lms_salary_slips'.
+ */
 export const uploadSalarySlipHandler = async (req: Request, res: Response): Promise<void> => {
   if (!req.file) {
     res.status(400).json({ error: 'Bad Request', message: 'No file was uploaded or file failed validation' });
     return;
   }
 
+  // Validate allowed extensions and mime types (PDF/JPG/JPEG/PNG, Max 5 MB)
+  const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png'];
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  if (!allowedExtensions.includes(ext)) {
+    res.status(400).json({
+      error: 'Validation Error',
+      message: 'Invalid file type. Only PDF, JPG, JPEG, and PNG files are allowed.',
+    });
+    return;
+  }
+
+  if (req.file.size > 5 * 1024 * 1024) {
+    res.status(400).json({
+      error: 'Validation Error',
+      message: 'File size exceeds maximum limit of 5 MB.',
+    });
+    return;
+  }
+
   try {
-    if (isCloudinaryConfigured) {
-      // Cloudinary Stream Upload
-      const uploadPromise = new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          {
-            folder: 'lms_salary_slips',
-            resource_type: 'auto',
-          },
-          (error, result) => {
-            if (error || !result) {
-              return reject(error || new Error('Cloudinary upload returned empty result'));
-            }
-            resolve({
-              secure_url: result.secure_url,
-              public_id: result.public_id,
-            });
-          }
-        );
-        stream.end(req.file!.buffer);
-      });
+    const isCloudinaryReady = getCloudinaryConfig();
 
-      const cloudinaryRes = await uploadPromise;
-
-      res.status(200).json({
-        message: 'Salary slip uploaded successfully to Cloudinary',
-        salarySlipUrl: cloudinaryRes.secure_url,
-        salarySlipPublicId: cloudinaryRes.public_id,
-        originalName: req.file.originalname,
+    if (!isCloudinaryReady) {
+      res.status(500).json({
+        error: 'Configuration Error',
+        message: 'Cloudinary environment variables (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET) are missing or invalid.',
       });
       return;
     }
 
-    // Local Disk Fallback (when Cloudinary environment credentials are not present)
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(req.file.originalname).toLowerCase();
-    const filename = `salary-slip-${uniqueSuffix}${ext}`;
-    const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'salary-slips');
-    const localFilePath = path.join(UPLOAD_DIR, filename);
+    // Stream Multer memory buffer directly to Cloudinary
+    const uploadPromise = new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'lms_salary_slips',
+          resource_type: 'auto',
+        },
+        (error, result) => {
+          if (error || !result) {
+            return reject(error || new Error('Cloudinary upload stream returned empty result'));
+          }
+          resolve({
+            secure_url: result.secure_url,
+            public_id: result.public_id,
+          });
+        }
+      );
+      uploadStream.end(req.file!.buffer);
+    });
 
-    fs.writeFileSync(localFilePath, req.file.buffer);
+    const cloudinaryRes = await uploadPromise;
 
-    const fileUrl = `/uploads/salary-slips/${filename}`;
+    console.log(`[Cloudinary Upload Success] Public ID: ${cloudinaryRes.public_id} | URL: ${cloudinaryRes.secure_url}`);
 
     res.status(200).json({
-      message: 'Salary slip uploaded successfully',
-      salarySlipUrl: fileUrl,
+      message: 'Salary slip uploaded successfully to Cloudinary',
+      salarySlipUrl: cloudinaryRes.secure_url,
+      salarySlipPublicId: cloudinaryRes.public_id,
       originalName: req.file.originalname,
     });
   } catch (error: any) {
-    console.error('[Loan Controller] Salary Slip Upload Error:', error);
-    res.status(500).json({
-      error: 'Upload Error',
-      message: error.message || 'Failed to upload salary slip document',
+    console.error('[Loan Controller] Salary Slip Cloudinary Upload Failure:', error);
+
+    let userFacingMessage = error.message || 'Failed to upload salary slip document to Cloudinary';
+
+    if (error.http_code === 403 || (error.message && error.message.includes('permissions'))) {
+      userFacingMessage =
+        'Cloudinary API Key lacks write permissions (actions=["create"]). Please update CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET in .env with a Master/Write API Key in Cloudinary Settings -> Access Keys.';
+    }
+
+    res.status(error.http_code || 500).json({
+      error: 'Cloudinary Upload Error',
+      message: userFacingMessage,
+      details: error,
     });
   }
 };
@@ -158,18 +184,15 @@ export const getLoanSalarySlipDocumentHandler = async (req: Request, res: Respon
     // Generate secure URL based on storage backend
     let secureDocumentUrl = loan.salarySlipUrl;
 
-    if (isCloudinaryConfigured && loan.salarySlipPublicId) {
-      // Cloudinary signed URL or secure URL
+    const isCloudinaryReady = getCloudinaryConfig();
+
+    if (isCloudinaryReady && loan.salarySlipPublicId) {
+      // Cloudinary signed URL valid for 1 hour
       secureDocumentUrl = cloudinary.url(loan.salarySlipPublicId, {
         secure: true,
         sign_url: true,
-        expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hour temporary access
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
       });
-    } else if (loan.salarySlipUrl.startsWith('/uploads/')) {
-      // Local document fallback: host-aware full URL
-      const host = req.get('host') || 'localhost:5000';
-      const protocol = req.protocol || 'http';
-      secureDocumentUrl = `${protocol}://${host}${loan.salarySlipUrl}`;
     }
 
     res.status(200).json({
@@ -261,20 +284,10 @@ export const createLoanHandler = async (req: Request, res: Response): Promise<vo
 
     // 2. Salary Slip File Format Verification
     const isCloudinaryUrl = salarySlipUrl.startsWith('http://') || salarySlipUrl.startsWith('https://');
-    const isLocalUrl = salarySlipUrl.startsWith('/uploads/salary-slips/');
 
-    if (!isCloudinaryUrl && !isLocalUrl) {
-      res.status(400).json({ error: 'Validation Error', message: 'Invalid salary slip URL format' });
+    if (!isCloudinaryUrl) {
+      res.status(400).json({ error: 'Validation Error', message: 'Invalid salary slip URL. Must be a valid Cloudinary document URL.' });
       return;
-    }
-
-    if (isLocalUrl) {
-      const filename = path.basename(salarySlipUrl);
-      const diskPath = path.join(process.cwd(), 'uploads', 'salary-slips', filename);
-      if (!fs.existsSync(diskPath)) {
-        res.status(400).json({ error: 'Validation Error', message: 'Referenced salary slip file does not exist on server' });
-        return;
-      }
     }
 
     // 3. Salary Slip Ownership Check - Prevent reusing another borrower's uploaded document
