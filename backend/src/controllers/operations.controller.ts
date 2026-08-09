@@ -376,6 +376,17 @@ export const recordPaymentHandler = async (req: Request, res: Response): Promise
       return;
     }
 
+    // Globally Unique UTR / Payment Reference Check
+    const existingPaymentWithRef = await Payment.findOne({ paymentReference: paymentReference.trim() });
+    if (existingPaymentWithRef) {
+      res.status(400).json({
+        success: false,
+        error: 'Validation Error',
+        message: 'UTR Number / Payment reference must be globally unique. This UTR reference has already been recorded.',
+      });
+      return;
+    }
+
     // Atomic find & update with conditional balance check
     const updatedLoan = await Loan.findOneAndUpdate(
       {
