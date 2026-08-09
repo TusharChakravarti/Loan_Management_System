@@ -1,5 +1,14 @@
 export type UserRole = 'ADMIN' | 'SALES' | 'SANCTION' | 'DISBURSEMENT' | 'COLLECTION' | 'BORROWER';
 
+export const UserRole = {
+  ADMIN: 'ADMIN' as const,
+  SALES: 'SALES' as const,
+  SANCTION: 'SANCTION' as const,
+  DISBURSEMENT: 'DISBURSEMENT' as const,
+  COLLECTION: 'COLLECTION' as const,
+  BORROWER: 'BORROWER' as const,
+};
+
 export interface User {
   _id: string;
   fullName: string;
