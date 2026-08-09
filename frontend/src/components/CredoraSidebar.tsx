@@ -51,14 +51,14 @@ export const CredoraSidebar: React.FC<CredoraSidebarProps> = ({
   const navItems = getNavItems(user?.role);
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-slate-900 text-slate-100 border-r border-slate-800 selection:bg-credora-600 selection:text-white">
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border-r border-slate-200 dark:border-slate-800 selection:bg-credora-600 selection:text-white transition-colors duration-200">
       {/* Header Branding */}
-      <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+      <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
         <CredoraLogo variant="full" size="md" showTagline />
         {onMobileClose && (
           <button
             onClick={onMobileClose}
-            className="md:hidden text-slate-400 hover:text-white p-1"
+            className="md:hidden text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-1"
             aria-label="Close menu"
           >
             ✕
@@ -68,7 +68,7 @@ export const CredoraSidebar: React.FC<CredoraSidebarProps> = ({
 
       {/* Navigation Links */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-1.5">
-        <span className="px-3 text-[10px] font-extrabold uppercase tracking-widest text-slate-500 block mb-2">
+        <span className="px-3 text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-2">
           Banking Navigation
         </span>
 
@@ -82,7 +82,7 @@ export const CredoraSidebar: React.FC<CredoraSidebarProps> = ({
               className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 ${
                 isActive
                   ? 'bg-credora-700 text-white shadow-sm ring-1 ring-white/10'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/70'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/70'
               }`}
             >
               <span className="text-base leading-none">{item.icon}</span>
@@ -93,22 +93,22 @@ export const CredoraSidebar: React.FC<CredoraSidebarProps> = ({
       </div>
 
       {/* Footer Profile & Controls */}
-      <div className="p-4 border-t border-slate-800/80 bg-slate-950/40 space-y-3">
+      <div className="p-4 border-t border-slate-200 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-950/40 space-y-3">
         <div className="flex items-center justify-between px-2">
           <div className="flex flex-col truncate pr-2">
-            <span className="font-extrabold text-xs text-white truncate">{user?.fullName}</span>
-            <span className="text-[10px] font-mono text-slate-400 truncate">{user?.email}</span>
+            <span className="font-extrabold text-xs text-slate-900 dark:text-white truncate">{user?.fullName}</span>
+            <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 truncate">{user?.email}</span>
           </div>
           <ThemeToggle />
         </div>
 
-        <div className="flex items-center justify-between pt-1 px-2 border-t border-slate-800/60">
-          <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider bg-credora-900/80 text-credora-300 border border-credora-700/60">
+        <div className="flex items-center justify-between pt-1 px-2 border-t border-slate-200 dark:border-slate-800/60">
+          <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider bg-credora-100 dark:bg-credora-900/80 text-credora-700 dark:text-credora-300 border border-credora-300 dark:border-credora-700/60">
             {user?.role}
           </span>
           <button
             onClick={logout}
-            className="text-[11px] font-bold text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+            className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 transition-colors cursor-pointer"
           >
             Sign Out →
           </button>
@@ -127,7 +127,7 @@ export const CredoraSidebar: React.FC<CredoraSidebarProps> = ({
       {/* Mobile Drawer Backdrop */}
       {mobileOpen && (
         <div
-          className="md:hidden fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200"
+          className="md:hidden fixed inset-0 z-40 bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200"
           onClick={onMobileClose}
         />
       )}
