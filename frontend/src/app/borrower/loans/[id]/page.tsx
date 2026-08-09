@@ -43,17 +43,11 @@ export default function SingleLoanDetailPage() {
     };
   }, [id]);
 
-  // Same-tab document viewing handler using authorized signed document URL
+  // Same-tab document viewing handler using secure authenticated binary preview stream
   const handleViewSalarySlip = async (loanId: string) => {
     setFetchingDoc(true);
     try {
-      const res = await loanApi.getSalarySlipUrl(loanId);
-      if (res && res.url) {
-        // Same-tab navigation allowing browser Back button to naturally return to loan details page
-        window.location.href = res.url;
-      } else {
-        alert('Unable to retrieve authorized document URL. Please try again.');
-      }
+      await loanApi.previewSalarySlip(loanId);
     } catch (err: any) {
       alert(err.message || 'Failed to retrieve salary slip document');
     } finally {

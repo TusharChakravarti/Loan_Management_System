@@ -168,27 +168,16 @@ export const loanApi = {
   },
 
   /**
-   * AUTHENTICATED SAME-TAB BINARY DOCUMENT PREVIEW HANDLER
+   * SECURE AUTHENTICATED DOCUMENT PREVIEW HANDLER
    * Sends Authorization: Bearer <token> header to backend streaming endpoint.
    * Parses Content-Disposition header for original filename, validates binary blob,
-   * and renders preview in the SAME TAB (window.location.href) so browser Back works naturally.
+   * and renders preview with object-fit: contain (images) or iframe (PDFs) in the SAME TAB (window.location.href).
    */
   previewSalarySlip: async (loanId: string): Promise<void> => {
     const token = getAuthToken();
     if (!token) {
       alert('Authentication required to preview document.');
       return;
-    }
-
-    // Try authorized signed URL first for direct same-tab navigation
-    try {
-      const docRes = await loanApi.getSalarySlipUrl(loanId);
-      if (docRes && docRes.url) {
-        window.location.href = docRes.url;
-        return;
-      }
-    } catch {
-      // Fallback to fetch binary blob and same-tab navigate
     }
 
     try {
@@ -253,7 +242,7 @@ export const loanApi = {
       const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
       const htmlBlobUrl = URL.createObjectURL(htmlBlob);
 
-      // Same-tab navigation (NO _blank, NO window.open)
+      // Same-tab navigation (NO _blank, NO window.open, NO raw Cloudinary URL bypass)
       window.location.href = htmlBlobUrl;
     } catch (err: any) {
       console.error('[Document Preview Exception]', err);
