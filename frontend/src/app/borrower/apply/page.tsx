@@ -39,6 +39,7 @@ export default function ApplyLoanPage() {
   // Loan Configuration State
   const [loanAmount, setLoanAmount] = useState<number>(100000);
   const [tenureDays, setTenureDays] = useState<number>(180);
+  const [interestMonthly, setInterestMonthly] = useState<number>(1);
 
   // Submission State
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -47,10 +48,12 @@ export default function ApplyLoanPage() {
   const [fetchingDoc, setFetchingDoc] = useState<boolean>(false);
 
   // Calculation Math
-  const interestRate = 12;
+  const interestAnnual = 12; // Authoritative Fixed 12% p.a.
   const numericSalary = typeof monthlySalary === 'number' ? monthlySalary : 0;
-  const simpleInterest = Math.round(((loanAmount * interestRate * tenureDays) / (365 * 100)) * 100) / 100;
+  const simpleInterest = Math.round(((loanAmount * interestAnnual * tenureDays) / (365 * 100)) * 100) / 100;
   const totalRepayment = Math.round((loanAmount + simpleInterest) * 100) / 100;
+  const tenureMonths = Math.max(1, tenureDays / 30);
+  const emi = Math.round((totalRepayment / tenureMonths) * 100) / 100;
 
   // Step 1 -> Step 2: Trigger BRE
   const handleRunBRE = async (e: React.FormEvent) => {
@@ -185,7 +188,7 @@ export default function ApplyLoanPage() {
       <div className="min-h-screen bg-slate-100 pb-12">
         <BorrowerNav title="Apply for Loan" subtitle="Multi-step borrower application wizard" />
 
-        <div className="max-w-3xl mx-auto px-6 space-y-6">
+        <div className="max-w-4xl mx-auto px-6 space-y-6">
           {/* Header */}
           <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <div>
@@ -446,99 +449,152 @@ export default function ApplyLoanPage() {
               </div>
             )}
 
-            {/* STEP 4: Loan Configuration */}
+            {/* STEP 4: Interactive Loan Calculator (Matches Reference UI) */}
             {step === 4 && (
               <div className="space-y-6">
                 <h2 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">
                   Step 4: Configure Loan Amount & Tenure
                 </h2>
 
-                <div className="space-y-6">
-                  {/* Loan Amount Slider */}
-                  <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <label className="text-xs font-bold text-slate-700 uppercase">Desired Loan Amount</label>
-                      <span className="text-xl font-black text-blue-600">₹{loanAmount.toLocaleString('en-IN')}</span>
+                <div className="bg-[#f6f8fd] p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-2xs space-y-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                    {/* Left Inputs Column */}
+                    <div className="lg:col-span-7 space-y-7">
+                      {/* 1. Loan Amount */}
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <label className="text-base font-extrabold text-slate-900 tracking-tight">Loan Amount</label>
+                          <div className="flex items-center bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-2xs font-bold text-slate-800">
+                            <input
+                              type="number"
+                              min={10000}
+                              max={500000}
+                              step={5000}
+                              value={loanAmount || ''}
+                              onChange={(e) => setLoanAmount(Math.min(500000, Math.max(10000, Number(e.target.value))))}
+                              className="w-24 text-right font-black text-slate-900 outline-hidden bg-transparent"
+                            />
+                            <span className="ml-2 text-slate-400 text-sm font-semibold">Rs.</span>
+                          </div>
+                        </div>
+                        <input
+                          type="range"
+                          min={10000}
+                          max={500000}
+                          step={5000}
+                          value={loanAmount}
+                          onChange={(e) => setLoanAmount(Number(e.target.value))}
+                          className="w-full h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                        />
+                      </div>
+
+                      {/* 2. Interest (In Months) */}
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-1.5">
+                            <label className="text-base font-extrabold text-slate-900 tracking-tight">Interest</label>
+                            <span className="text-xs font-semibold text-slate-400">(In Months)</span>
+                          </div>
+                          <div className="flex items-center bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-2xs font-bold text-slate-800">
+                            <input
+                              type="number"
+                              min={0.5}
+                              max={3}
+                              step={0.1}
+                              value={interestMonthly || 1}
+                              onChange={(e) => setInterestMonthly(Number(e.target.value))}
+                              className="w-16 text-right font-black text-slate-900 outline-hidden bg-transparent"
+                            />
+                            <span className="ml-2 text-slate-400 text-sm font-semibold">%</span>
+                          </div>
+                        </div>
+                        <input
+                          type="range"
+                          min={0.5}
+                          max={3}
+                          step={0.1}
+                          value={interestMonthly}
+                          onChange={(e) => setInterestMonthly(Number(e.target.value))}
+                          className="w-full h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                        />
+                      </div>
+
+                      {/* 3. Tenure */}
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <label className="text-base font-extrabold text-slate-900 tracking-tight">Tenure</label>
+                          <div className="flex items-center bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-2xs font-bold text-slate-800">
+                            <input
+                              type="number"
+                              min={30}
+                              max={365}
+                              step={5}
+                              value={tenureDays || ''}
+                              onChange={(e) => setTenureDays(Math.min(365, Math.max(30, Number(e.target.value))))}
+                              className="w-16 text-right font-black text-slate-900 outline-hidden bg-transparent"
+                            />
+                            <span className="ml-2 text-slate-400 text-sm font-semibold">Days</span>
+                          </div>
+                        </div>
+                        <div className="relative flex items-center p-1 rounded-xl bg-white border border-slate-300">
+                          <input
+                            type="range"
+                            min={30}
+                            max={365}
+                            step={5}
+                            value={tenureDays}
+                            onChange={(e) => setTenureDays(Number(e.target.value))}
+                            className="w-full h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <input
-                      type="range"
-                      min={50000}
-                      max={500000}
-                      step={5000}
-                      value={loanAmount}
-                      onChange={(e) => setLoanAmount(Number(e.target.value))}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                    />
-                    <div className="flex justify-between text-[11px] text-slate-400 font-semibold">
-                      <span>Min: ₹50,000</span>
-                      <span>Max: ₹5,00,000</span>
+
+                    {/* Right Summary Column */}
+                    <div className="lg:col-span-5 bg-white p-7 sm:p-8 rounded-2xl shadow-xs border border-slate-100 space-y-6">
+                      <div className="space-y-4 text-sm font-medium text-slate-700">
+                        <div className="flex justify-between items-center">
+                          <span>Loan Amount selected</span>
+                          <span className="font-black text-slate-900 text-base">₹{loanAmount.toLocaleString('en-IN')}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <span>EMI (Approx. Monthly)</span>
+                          <span className="font-black text-slate-900 text-base">₹{emi.toLocaleString('en-IN')}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <span>Total Interest</span>
+                          <span className="font-black text-slate-900 text-base">₹{simpleInterest.toLocaleString('en-IN')}</span>
+                        </div>
+
+                        <hr className="border-slate-100 my-2" />
+
+                        <div className="flex justify-between items-center pt-1">
+                          <span className="font-bold text-slate-900 text-base">Total Amount</span>
+                          <span className="font-black text-slate-900 text-xl">₹{totalRepayment.toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setStep(5)}
+                        className="w-full py-4 bg-[#0066ff] hover:bg-blue-700 text-white font-black text-base rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.99] flex items-center justify-center gap-2"
+                      >
+                        <span>Apply for Loan →</span>
+                      </button>
                     </div>
                   </div>
+                </div>
 
-                  {/* Tenure Slider */}
-                  <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <label className="text-xs font-bold text-slate-700 uppercase">Tenure Duration</label>
-                      <span className="text-xl font-black text-slate-800">{tenureDays} Days</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={30}
-                      max={365}
-                      step={5}
-                      value={tenureDays}
-                      onChange={(e) => setTenureDays(Number(e.target.value))}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                    />
-                    <div className="flex justify-between text-[11px] text-slate-400 font-semibold">
-                      <span>Min: 30 Days</span>
-                      <span>Max: 365 Days</span>
-                    </div>
-                  </div>
-
-                  {/* Live Calculation Output Card */}
-                  <div className="p-5 rounded-xl bg-blue-50 border border-blue-200 grid grid-cols-3 gap-4 text-center">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 block">
-                        Interest Rate
-                      </span>
-                      <span className="text-base font-bold text-slate-800 block mt-1">12% p.a. (Fixed)</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 block">
-                        Simple Interest (SI)
-                      </span>
-                      <span className="text-base font-bold text-slate-800 block mt-1">
-                        ₹{simpleInterest.toLocaleString('en-IN')}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 block">
-                        Total Repayment
-                      </span>
-                      <span className="text-lg font-black text-blue-700 block mt-1">
-                        ₹{totalRepayment.toLocaleString('en-IN')}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setStep(3)}
-                      className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200"
-                    >
-                      ← Back
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setStep(5)}
-                      className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-lg shadow-sm transition-colors"
-                    >
-                      Review Application →
-                    </button>
-                  </div>
+                <div className="flex justify-start pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setStep(3)}
+                    className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200"
+                  >
+                    ← Back to Salary Slip Upload
+                  </button>
                 </div>
               </div>
             )}
