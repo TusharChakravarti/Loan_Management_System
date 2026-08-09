@@ -107,8 +107,8 @@ export const CredoraSidebar: React.FC<CredoraSidebarProps> = ({
 
   return (
     <>
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:block w-64 shrink-0 h-screen sticky top-0 z-30">
+      {/* Desktop Sidebar (Fixed on left below top header) */}
+      <aside className="hidden md:block fixed top-16 left-0 bottom-0 w-64 z-30">
         {sidebarContent}
       </aside>
 

@@ -138,7 +138,8 @@ export default function SingleLoanDetailPage() {
         <div className="flex pt-16 min-h-screen">
           <CredoraSidebar mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
 
-          <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-8 space-y-6">
+          <div className="flex-1 md:pl-64 min-w-0">
+            <main className="max-w-5xl w-full mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-8 space-y-6">
             <PageHeader
               title={`Loan #${loan ? loan._id.slice(-6).toUpperCase() : id}`}
               subtitle="Institutional Credit Lifecycle & Repayment Ledger"
@@ -311,6 +312,7 @@ export default function SingleLoanDetailPage() {
           </main>
         </div>
       </div>
+    </div>
 
       <DocumentPreviewModal
         isOpen={previewModalOpen}

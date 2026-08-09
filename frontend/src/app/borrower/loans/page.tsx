@@ -75,7 +75,8 @@ export default function BorrowerLoansPage() {
         <div className="flex pt-16 min-h-screen">
           <CredoraSidebar mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
 
-          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-8 space-y-6">
+          <div className="flex-1 md:pl-64 min-w-0">
+            <main className="max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-8 space-y-6">
             <PageHeader
               title={`Welcome back, ${user?.fullName || 'Valued Customer'}`}
               subtitle="Track live status, repayment schedules, and loan lifecycle"
@@ -213,6 +214,7 @@ export default function BorrowerLoansPage() {
           </main>
         </div>
       </div>
+    </div>
     </ProtectedRoute>
   );
 }
