@@ -17,20 +17,43 @@ export default function SingleLoanDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [fetchingDoc, setFetchingDoc] = useState<boolean>(false);
 
-  useEffect(() => {
-    if (id) {
-      loanApi
-        .getLoanById(id)
-        .then((res) => setLoan(res.loan))
-        .catch((err) => setError(err.message || 'Failed to retrieve loan application details'))
-        .finally(() => setLoading(false));
+  // Real-time backend re-validation on mount & window focus
+  const fetchLoan = async () => {
+    if (!id) return;
+    try {
+      const res = await loanApi.getLoanById(id);
+      setLoan(res.loan);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to retrieve loan application details');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchLoan();
+
+    const handleFocus = () => {
+      fetchLoan();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [id]);
 
+  // Same-tab document viewing handler using authorized signed document URL
   const handleViewSalarySlip = async (loanId: string) => {
     setFetchingDoc(true);
     try {
-      await loanApi.previewSalarySlip(loanId);
+      const res = await loanApi.getSalarySlipUrl(loanId);
+      if (res && res.url) {
+        // Same-tab navigation allowing browser Back button to naturally return to loan details page
+        window.location.href = res.url;
+      } else {
+        alert('Unable to retrieve authorized document URL. Please try again.');
+      }
     } catch (err: any) {
       alert(err.message || 'Failed to retrieve salary slip document');
     } finally {
@@ -264,7 +287,7 @@ export default function SingleLoanDetailPage() {
                         disabled={fetchingDoc}
                         className="font-bold text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-50 text-xs inline-flex items-center gap-1"
                       >
-                        <span>{fetchingDoc ? 'Opening Preview...' : loan.salarySlipOriginalName}</span>
+                        <span>{fetchingDoc ? 'Opening Document...' : loan.salarySlipOriginalName}</span>
                         <span>↗</span>
                       </button>
                     </div>
