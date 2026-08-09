@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { CredoraLogo } from '../../components/CredoraLogo';
+import { ThemeToggle } from '../../components/ThemeToggle';
 import { authApi } from '../../lib/api';
 
 export default function ForgotPasswordPage() {
