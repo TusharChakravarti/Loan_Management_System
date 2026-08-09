@@ -107,12 +107,12 @@ export const CredoraSidebar: React.FC<CredoraSidebarProps> = ({
 
   return (
     <>
-      {/* Desktop Sidebar (Fixed on left below top header) */}
+      {/* Desktop sidebar */}
       <aside className="hidden md:block fixed top-16 left-0 bottom-0 w-64 z-30">
         {sidebarContent}
       </aside>
 
-      {/* Mobile Drawer Backdrop */}
+      {/* Mobile backdrop */}
       {mobileOpen && (
         <div
           className="md:hidden fixed inset-0 z-40 bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200"
@@ -120,7 +120,7 @@ export const CredoraSidebar: React.FC<CredoraSidebarProps> = ({
         />
       )}
 
-      {/* Mobile Drawer */}
+      {/* Mobile drawer */}
       <aside
         className={`md:hidden fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-200 ease-in-out ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'

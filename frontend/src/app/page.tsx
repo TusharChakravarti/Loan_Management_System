@@ -51,7 +51,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white flex flex-col justify-between transition-colors duration-200 selection:bg-credora-600 selection:text-white">
-      {/* Sticky Full-Width Header */}
+      {/* Header */}
       <header className="sticky top-0 z-40 w-full bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex justify-between items-center">
           <CredoraLogo variant="full" size="md" showTagline />
@@ -74,7 +74,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main content */}
       <main className="max-w-4xl mx-auto w-full text-center space-y-8 px-4 sm:px-6 my-12 md:my-16">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-credora-50 dark:bg-credora-950/80 border border-credora-200 dark:border-credora-800/80 text-credora-700 dark:text-credora-300 text-xs font-extrabold tracking-wide">
           <span className="w-2 h-2 rounded-full bg-credora-500 animate-pulse"></span>
@@ -104,7 +104,7 @@ export default function Home() {
           </Link>
         </div>
 
-        {/* Feature Cards */}
+        {/* Feature cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-12 text-left">
           <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800/80 shadow-xs space-y-1">
             <span className="text-[10px] font-mono text-credora-600 dark:text-credora-400 uppercase font-extrabold">Borrower Desk</span>

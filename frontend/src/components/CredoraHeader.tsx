@@ -42,7 +42,7 @@ export const CredoraHeader: React.FC<CredoraHeaderProps> = ({
   return (
     <header className="fixed top-0 left-0 right-0 w-full h-16 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors duration-200 shadow-2xs">
       <div className="w-full h-full px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 max-w-full">
-        {/* Left Section: Mobile Menu Button + Main CREDORA Logo + Title */}
+        {/* Logo & page title */}
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           {onMobileMenuToggle && (
             <button
@@ -56,7 +56,6 @@ export const CredoraHeader: React.FC<CredoraHeaderProps> = ({
             </button>
           )}
 
-          {/* CREDORA Logo - Main Full-Width Header Branding */}
           <Link
             href={
               user?.role === UserRole.BORROWER
@@ -86,7 +85,7 @@ export const CredoraHeader: React.FC<CredoraHeaderProps> = ({
           )}
         </div>
 
-        {/* Center Section: Ops Desk Quick Switcher Pills (For Ops/Admin Users) */}
+        {/* Ops desk navigation links */}
         {shouldShowOpsNav && visibleOpsLinks.length > 0 && (
           <div className="hidden lg:flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-800/60 p-1 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
             {visibleOpsLinks.map((link) => {
@@ -108,7 +107,7 @@ export const CredoraHeader: React.FC<CredoraHeaderProps> = ({
           </div>
         )}
 
-        {/* Right Section: Theme Toggle & User Info & Sign Out */}
+        {/* User profile & theme controls */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           <ThemeToggle />
 

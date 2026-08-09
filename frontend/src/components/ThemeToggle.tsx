@@ -19,7 +19,6 @@ export const ThemeToggle: React.FC<{ className?: string }> = ({ className = '' }
       aria-label="Toggle theme mode"
     >
       {theme === 'dark' ? (
-        /* Sun Icon for Light Mode Switch */
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             strokeLinecap="round"
@@ -29,7 +28,6 @@ export const ThemeToggle: React.FC<{ className?: string }> = ({ className = '' }
           />
         </svg>
       ) : (
-        /* Moon Icon for Dark Mode Switch */
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             strokeLinecap="round"
