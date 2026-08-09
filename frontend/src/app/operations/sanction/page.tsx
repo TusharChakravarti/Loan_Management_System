@@ -2,21 +2,31 @@
 
 import React, { useEffect, useState } from 'react';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
+import { CredoraSidebar } from '../../../components/CredoraSidebar';
 import { OperationsNav } from '../../../components/OperationsNav';
+import { PageHeader } from '../../../components/PageHeader';
+import { FinancialMetricCard } from '../../../components/FinancialMetricCard';
+import { StatusBadge } from '../../../components/StatusBadge';
 import { DocumentPreviewModal } from '../../../components/DocumentPreviewModal';
+import { SkeletonTable } from '../../../components/SkeletonLoader';
+import { EmptyState } from '../../../components/EmptyState';
+import { ErrorState } from '../../../components/ErrorState';
+import { useToast } from '../../../context/ToastContext';
 import { operationsApi, loanApi } from '../../../lib/api';
 import { broadcastLoanUpdate, subscribeToLoanUpdates } from '../../../lib/events';
 import { Loan } from '../../../types/loan';
+import { UserRole } from '../../../types/auth';
 
 export default function SanctionDashboardPage() {
+  const { error: toastError, success: toastSuccess } = useToast();
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
   const [remarks, setRemarks] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [fetchingDoc, setFetchingDoc] = useState<boolean>(false);
 
   // Document Preview Modal State
@@ -42,17 +52,14 @@ export default function SanctionDashboardPage() {
   useEffect(() => {
     fetchLoans(true);
 
-    // 1. Silent Auto-Polling Heartbeat (3s)
     const interval = setInterval(() => {
       fetchLoans(false);
     }, 3000);
 
-    // 2. Live Cross-Tab Event Subscription
     const unsubscribe = subscribeToLoanUpdates(() => {
       fetchLoans(false);
     });
 
-    // 3. Window Focus & Visibility Change Listeners
     const handleFocus = () => fetchLoans(false);
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleFocus);
@@ -68,7 +75,6 @@ export default function SanctionDashboardPage() {
   const handleSanctionAction = async (action: 'APPROVE' | 'REJECT') => {
     if (!selectedLoan) return;
     setSubmitting(true);
-    setActionSuccess(null);
     try {
       let res;
       if (action === 'APPROVE') {
@@ -78,12 +84,12 @@ export default function SanctionDashboardPage() {
         res = await operationsApi.rejectSanctionLoan(selectedLoan._id, { remarks });
         broadcastLoanUpdate({ type: 'SANCTION_REJECTED', loanId: selectedLoan._id });
       }
-      setActionSuccess(res.message);
+      toastSuccess(res.message);
       setSelectedLoan(null);
       setRemarks('');
       await fetchLoans(false);
     } catch (err: any) {
-      alert(err.message || 'Failed to execute Sanction action');
+      toastError(err.message || 'Failed to execute Sanction action');
     } finally {
       setSubmitting(false);
     }
@@ -104,7 +110,7 @@ export default function SanctionDashboardPage() {
         setPreviewIsImage(res.isImage);
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to retrieve salary slip document');
+      toastError(err.message || 'Failed to retrieve salary slip document');
       setPreviewModalOpen(false);
     } finally {
       setFetchingDoc(false);
@@ -112,156 +118,184 @@ export default function SanctionDashboardPage() {
     }
   };
 
+  const totalVolume = loans.reduce((acc, curr) => acc + curr.loanAmount, 0);
+
   return (
-    <ProtectedRoute allowedRoles={['SANCTION', 'ADMIN']}>
-      <div className="min-h-screen bg-slate-100 pb-12">
-        <OperationsNav
-          title="Sanction Desk Module"
-          subtitle="Credit risk assessment & sanction approvals"
-        />
+    <ProtectedRoute allowedRoles={[UserRole.SANCTION, UserRole.ADMIN]}>
+      <div className="flex min-h-screen bg-slate-50 dark:bg-navy-950 transition-colors duration-200">
+        <CredoraSidebar mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
 
-        <main className="max-w-7xl mx-auto p-6 space-y-6">
-          {actionSuccess && (
-            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-bold rounded-xl flex justify-between items-center">
-              <span>✓ {actionSuccess}</span>
-              <button onClick={() => setActionSuccess(null)} className="text-xs text-emerald-600 font-bold">
-                Dismiss
-              </button>
-            </div>
-          )}
+        <div className="flex-1 flex flex-col min-w-0">
+          <OperationsNav
+            title="Sanction Desk Module"
+            subtitle="Credit risk evaluation & sanction approval"
+            onMobileMenuToggle={() => setMobileMenuOpen(true)}
+          />
 
-          {/* Queue Statistics Header */}
-          <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <div>
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">
-                Awaiting Sanction Approval
-              </span>
-              <span className="text-3xl font-black text-slate-900">{loans.length}</span>
-            </div>
-            <button
-              onClick={() => fetchLoans(true)}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+          <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+            <PageHeader
+              title="Credit Sanction Queue"
+              subtitle="Review verified files, evaluate risk parameters, and issue final credit sanctioning"
+              badgeText="SANCTION DESK"
             >
-              <span>🔄</span>
-              <span>Refresh Queue</span>
-            </button>
-          </div>
+              <button
+                onClick={() => fetchLoans(true)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                🔄 Live Refresh
+              </button>
+            </PageHeader>
 
-          {/* Sanction Queue Table */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-6 border-b border-slate-100">
-              <h2 className="text-lg font-black text-slate-900">Sanction Review Queue</h2>
-              <p className="text-slate-500 text-xs mt-0.5">
-                Review verified applications passed by Sales Team and make final credit approval decisions.
-              </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FinancialMetricCard
+                title="Awaiting Sanction Decision"
+                value={loans.length}
+                subtitle="Verified Sales files requiring credit evaluation"
+                icon="⚖️"
+                variant="warning"
+              />
+              <FinancialMetricCard
+                title="Sanction Queue Value"
+                value={`₹${totalVolume.toLocaleString('en-IN')}`}
+                subtitle="Total principal value pending sanctioning"
+                icon="💎"
+                variant="default"
+              />
             </div>
 
-            {loading ? (
-              <div className="p-12 text-center text-slate-400 text-xs font-bold animate-pulse">
-                Loading Sanction review applications...
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-2xs transition-colors duration-200">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800">
+                <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
+                  Sanction Assessment Queue ({loans.length})
+                </h2>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Review applicant profiles & sales notes to confirm credit sanctioning
+                </p>
               </div>
-            ) : error ? (
-              <div className="p-6 bg-rose-50 text-rose-700 text-xs font-bold">{error}</div>
-            ) : loans.length === 0 ? (
-              <div className="p-12 text-center text-slate-400 text-xs font-semibold">
-                No pending loan applications awaiting Sanction approval.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-500 font-extrabold uppercase tracking-wider border-b border-slate-200">
-                    <tr>
-                      <th className="px-6 py-4">Borrower</th>
-                      <th className="px-6 py-4">PAN</th>
-                      <th className="px-6 py-4">Salary</th>
-                      <th className="px-6 py-4">Amount</th>
-                      <th className="px-6 py-4">Sales Remarks</th>
-                      <th className="px-6 py-4 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                    {loans.map((loan) => (
-                      <tr key={loan._id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-6 py-4">
-                          <span className="font-bold text-slate-900 block">{loan.fullName}</span>
-                          <button
-                            onClick={() => handleViewSalarySlip(loan._id, loan.salarySlipOriginalName)}
-                            className="text-[10px] text-blue-600 font-bold hover:underline block mt-0.5 cursor-pointer"
-                          >
-                            📄 View Salary Slip ↗
-                          </button>
-                        </td>
-                        <td className="px-6 py-4 font-mono font-bold uppercase">{loan.pan}</td>
-                        <td className="px-6 py-4 font-bold">₹{loan.monthlySalary.toLocaleString('en-IN')}</td>
-                        <td className="px-6 py-4 font-black text-blue-600">₹{loan.loanAmount.toLocaleString('en-IN')}</td>
-                        <td className="px-6 py-4 text-slate-600 font-normal italic">
-                          "{loan.salesRemarks || 'Verified by Sales Team'}"
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => {
-                              setSelectedLoan(loan);
-                              setRemarks('');
-                            }}
-                            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors cursor-pointer"
-                          >
-                            Assess & Sanction →
-                          </button>
-                        </td>
+
+              {loading ? (
+                <SkeletonTable rows={4} cols={6} />
+              ) : error ? (
+                <div className="p-6">
+                  <ErrorState message={error} onRetry={() => fetchLoans(true)} />
+                </div>
+              ) : loans.length === 0 ? (
+                <EmptyState
+                  title="Sanction Queue Clear"
+                  description="There are currently no verified loan files awaiting credit sanction decision."
+                  icon="⚖️"
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+                      <tr>
+                        <th className="px-6 py-4">Borrower Details</th>
+                        <th className="px-6 py-4">PAN Card</th>
+                        <th className="px-6 py-4">Monthly Income</th>
+                        <th className="px-6 py-4">Requested Principal</th>
+                        <th className="px-6 py-4">Sales Verification Notes</th>
+                        <th className="px-6 py-4 text-right">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </main>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium text-slate-800 dark:text-slate-200">
+                      {loans.map((loan) => (
+                        <tr
+                          key={loan._id}
+                          className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                        >
+                          <td className="px-6 py-4">
+                            <span className="font-extrabold text-slate-900 dark:text-white block">
+                              {loan.fullName}
+                            </span>
+                            <button
+                              onClick={() => handleViewSalarySlip(loan._id, loan.salarySlipOriginalName)}
+                              className="text-[10px] text-credora-600 dark:text-credora-400 font-extrabold hover:underline block mt-0.5 cursor-pointer"
+                            >
+                              📄 Salary Slip ↗
+                            </button>
+                          </td>
+                          <td className="px-6 py-4 font-mono font-extrabold uppercase text-slate-900 dark:text-slate-200">
+                            {loan.pan}
+                          </td>
+                          <td className="px-6 py-4 font-extrabold text-slate-900 dark:text-white">
+                            ₹{loan.monthlySalary.toLocaleString('en-IN')}
+                          </td>
+                          <td className="px-6 py-4 font-black text-credora-600 dark:text-credora-400">
+                            ₹{loan.loanAmount.toLocaleString('en-IN')}
+                          </td>
+                          <td className="px-6 py-4 text-slate-600 dark:text-slate-400 font-normal italic">
+                            "{loan.salesRemarks || 'Verified by Sales Desk'}"
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() => {
+                                setSelectedLoan(loan);
+                                setRemarks('');
+                              }}
+                              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer"
+                            >
+                              Assess & Sanction →
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </main>
+        </div>
 
         {/* Sanction Decision Modal */}
         {selectedLoan && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg p-6 space-y-5">
-              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                <h3 className="text-base font-black text-slate-900">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-xs p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-lg p-6 space-y-5 transition-colors">
+              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
                   Sanction Assessment #{selectedLoan._id.slice(-6).toUpperCase()}
                 </h3>
-                <button onClick={() => setSelectedLoan(null)} className="text-xs text-slate-400 font-bold hover:text-slate-600 cursor-pointer">
+                <button
+                  onClick={() => setSelectedLoan(null)}
+                  className="text-xs text-slate-400 font-bold hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                >
                   ✕ Close
                 </button>
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-xl space-y-2 text-xs">
-                <p><strong className="text-slate-500 font-semibold">Applicant:</strong> {selectedLoan.fullName} ({selectedLoan.pan})</p>
-                <p><strong className="text-slate-500 font-semibold">Requested Amount:</strong> ₹{selectedLoan.loanAmount.toLocaleString('en-IN')} for {selectedLoan.tenureDays} Days</p>
-                <p><strong className="text-slate-500 font-semibold">Sales Notes:</strong> "{selectedLoan.salesRemarks || 'N/A'}"</p>
+              <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl space-y-2 text-xs text-slate-800 dark:text-slate-200">
+                <p><strong className="text-slate-500 dark:text-slate-400">Applicant:</strong> {selectedLoan.fullName} ({selectedLoan.pan})</p>
+                <p><strong className="text-slate-500 dark:text-slate-400">Requested Principal:</strong> ₹{selectedLoan.loanAmount.toLocaleString('en-IN')} for {selectedLoan.tenureDays} Days</p>
+                <p><strong className="text-slate-500 dark:text-slate-400">Sales Notes:</strong> "{selectedLoan.salesRemarks || 'Verified'}"</p>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                   Sanction Remarks / Credit Approval Justification
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="e.g. Credit score and debt-to-income ratio meet risk criteria. Approved."
+                  placeholder="e.g. Risk score and debt capacity verified. Credit sanction granted."
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-                  className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-900"
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs font-medium outline-none focus:ring-2 focus:ring-credora-500"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+              <div className="flex justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
                   disabled={submitting}
                   onClick={() => handleSanctionAction('REJECT')}
-                  className="px-4 py-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                  className="px-4 py-2 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-300 hover:bg-rose-100 font-extrabold text-xs rounded-xl transition-colors cursor-pointer"
                 >
-                  Reject & Decline
+                  Decline Sanction
                 </button>
 
                 <button
                   disabled={submitting}
                   onClick={() => handleSanctionAction('APPROVE')}
-                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors cursor-pointer"
+                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
                   {submitting ? 'Processing...' : 'Sanction & Send to Disbursement →'}
                 </button>
@@ -270,7 +304,6 @@ export default function SanctionDashboardPage() {
           </div>
         )}
 
-        {/* Document Preview Modal Overlay */}
         <DocumentPreviewModal
           isOpen={previewModalOpen}
           onClose={() => setPreviewModalOpen(false)}

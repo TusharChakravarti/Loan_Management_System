@@ -2,28 +2,36 @@
 
 import React, { useEffect, useState } from 'react';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
+import { CredoraSidebar } from '../../../components/CredoraSidebar';
 import { OperationsNav } from '../../../components/OperationsNav';
+import { PageHeader } from '../../../components/PageHeader';
+import { FinancialMetricCard } from '../../../components/FinancialMetricCard';
+import { StatusBadge } from '../../../components/StatusBadge';
+import { SkeletonTable } from '../../../components/SkeletonLoader';
+import { EmptyState } from '../../../components/EmptyState';
+import { ErrorState } from '../../../components/ErrorState';
+import { useToast } from '../../../context/ToastContext';
 import { operationsApi } from '../../../lib/api';
 import { broadcastLoanUpdate, subscribeToLoanUpdates } from '../../../lib/events';
 import { Loan } from '../../../types/loan';
 import { Payment } from '../../../types/operations';
+import { UserRole } from '../../../types/auth';
 
 export default function CollectionDashboardPage() {
+  const { error: toastError, success: toastSuccess } = useToast();
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Selected Loan for Repayment Recording or History View
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [fetchingPayments, setFetchingPayments] = useState<boolean>(false);
 
-  // Payment Form State
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentReference, setPaymentReference] = useState<string>('');
   const [remarks, setRemarks] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   const fetchLoans = async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -41,17 +49,14 @@ export default function CollectionDashboardPage() {
   useEffect(() => {
     fetchLoans(true);
 
-    // 1. Silent Auto-Polling Heartbeat (3s)
     const interval = setInterval(() => {
       fetchLoans(false);
     }, 3000);
 
-    // 2. Live Cross-Tab Event Subscription
     const unsubscribe = subscribeToLoanUpdates(() => {
       fetchLoans(false);
     });
 
-    // 3. Window Focus & Visibility Change Listeners
     const handleFocus = () => fetchLoans(false);
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleFocus);
@@ -84,22 +89,20 @@ export default function CollectionDashboardPage() {
     e.preventDefault();
     if (!selectedLoan || paymentAmount <= 0 || !paymentReference.trim()) return;
     setSubmitting(true);
-    setActionSuccess(null);
     try {
       const res = await operationsApi.recordPayment(selectedLoan._id, {
         amount: paymentAmount,
         paymentReference: paymentReference.trim(),
         remarks,
       });
-      setActionSuccess(res.message);
+      toastSuccess(res.message);
 
-      // Broadcast live event across all tabs/windows
       broadcastLoanUpdate({ type: 'PAYMENT_RECORDED', loanId: selectedLoan._id });
 
       setSelectedLoan(null);
       await fetchLoans(false);
     } catch (err: any) {
-      alert(err.message || 'Failed to record repayment');
+      toastError(err.message || 'Failed to record repayment');
     } finally {
       setSubmitting(false);
     }
@@ -109,179 +112,186 @@ export default function CollectionDashboardPage() {
   const totalCollected = loans.reduce((sum, l) => sum + l.totalPaid, 0);
 
   return (
-    <ProtectedRoute allowedRoles={['COLLECTION', 'ADMIN']}>
-      <div className="min-h-screen bg-slate-100 pb-12">
-        <OperationsNav
-          title="Collection Desk Module"
-          subtitle="Repayment tracking, EMI recording & loan closure"
-        />
+    <ProtectedRoute allowedRoles={[UserRole.COLLECTION, UserRole.ADMIN]}>
+      <div className="flex min-h-screen bg-slate-50 dark:bg-navy-950 transition-colors duration-200">
+        <CredoraSidebar mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
 
-        <main className="max-w-7xl mx-auto p-6 space-y-6">
-          {actionSuccess && (
-            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-bold rounded-xl flex justify-between items-center">
-              <span>✓ {actionSuccess}</span>
-              <button onClick={() => setActionSuccess(null)} className="text-xs text-emerald-600 font-bold">
-                Dismiss
-              </button>
-            </div>
-          )}
+        <div className="flex-1 flex flex-col min-w-0">
+          <OperationsNav
+            title="Collection Servicing Module"
+            subtitle="Repayment tracking, payment ledger & automated loan closure"
+            onMobileMenuToggle={() => setMobileMenuOpen(true)}
+          />
 
-          {/* Portfolio Metrics Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">
-                Active Loan Portfolio
-              </span>
-              <span className="text-3xl font-black text-slate-900 mt-1 block">{loans.length}</span>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">
-                Total Outstanding Balance
-              </span>
-              <span className="text-3xl font-black text-rose-600 mt-1 block">
-                ₹{totalOutstanding.toLocaleString('en-IN')}
-              </span>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">
-                Total Collected Funds
-              </span>
-              <span className="text-3xl font-black text-emerald-600 mt-1 block">
-                ₹{totalCollected.toLocaleString('en-IN')}
-              </span>
-            </div>
-          </div>
-
-          {/* Active Loans Table */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="flex justify-between items-center p-6 border-b border-slate-100">
-              <div>
-                <h2 className="text-lg font-black text-slate-900">Active Repayment Accounts</h2>
-                <p className="text-slate-500 text-xs mt-0.5">
-                  Record borrower EMI payments, view transaction ledger history, and process automatic loan closures.
-                </p>
-              </div>
-
+          <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+            <PageHeader
+              title="Collection Servicing Desk"
+              subtitle="Monitor active credit balances, record borrower UTR payments & manage portfolio servicing"
+              badgeText="COLLECTION DESK"
+            >
               <button
                 onClick={() => fetchLoans(true)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-colors cursor-pointer"
               >
-                <span>🔄</span>
-                <span>Refresh Queue</span>
+                🔄 Live Refresh
               </button>
+            </PageHeader>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FinancialMetricCard
+                title="Active Credit Accounts"
+                value={loans.length}
+                subtitle="Total disbursed accounts in servicing"
+                icon="🏦"
+                variant="primary"
+              />
+              <FinancialMetricCard
+                title="Outstanding Balance"
+                value={`₹${totalOutstanding.toLocaleString('en-IN')}`}
+                subtitle="Remaining portfolio credit balance"
+                icon="⚠️"
+                variant="danger"
+              />
+              <FinancialMetricCard
+                title="Total Recovered Capital"
+                value={`₹${totalCollected.toLocaleString('en-IN')}`}
+                subtitle="Total repayments credited to date"
+                icon="✓"
+                variant="success"
+              />
             </div>
 
-            {loading ? (
-              <div className="p-12 text-center text-slate-400 text-xs font-bold animate-pulse">
-                Loading Active loan accounts...
-              </div>
-            ) : error ? (
-              <div className="p-6 bg-rose-50 text-rose-700 text-xs font-bold">{error}</div>
-            ) : loans.length === 0 ? (
-              <div className="p-12 text-center text-slate-400 text-xs font-semibold">
-                No active loans requiring collection servicing.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-500 font-extrabold uppercase tracking-wider border-b border-slate-200">
-                    <tr>
-                      <th className="px-6 py-4">Borrower</th>
-                      <th className="px-6 py-4">PAN</th>
-                      <th className="px-6 py-4">Total Repayment</th>
-                      <th className="px-6 py-4">Total Paid</th>
-                      <th className="px-6 py-4">Outstanding</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                    {loans.map((loan) => (
-                      <tr key={loan._id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-6 py-4">
-                          <span className="font-bold text-slate-900 block">{loan.fullName}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">#{loan._id.slice(-6).toUpperCase()}</span>
-                        </td>
-                        <td className="px-6 py-4 font-mono font-bold uppercase">{loan.pan}</td>
-                        <td className="px-6 py-4 font-bold">₹{loan.totalRepayment.toLocaleString('en-IN')}</td>
-                        <td className="px-6 py-4 font-bold text-emerald-600">₹{loan.totalPaid.toLocaleString('en-IN')}</td>
-                        <td className="px-6 py-4 font-black text-rose-600">
-                          ₹{loan.outstandingBalance.toLocaleString('en-IN')}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase ${
-                              loan.status === 'CLOSED'
-                                ? 'bg-slate-100 text-slate-700'
-                                : 'bg-emerald-100 text-emerald-800'
-                            }`}
-                          >
-                            {loan.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => openLoanDetails(loan)}
-                            disabled={loan.status === 'CLOSED'}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
-                          >
-                            Record Payment →
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </main>
-
-        {/* Record Repayment Modal */}
-        {selectedLoan && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl p-6 space-y-6 my-8">
-              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-2xs transition-colors duration-200">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
                 <div>
-                  <h3 className="text-base font-black text-slate-900">
-                    Collection Servicing #{selectedLoan._id.slice(-6).toUpperCase()}
-                  </h3>
-                  <p className="text-xs text-slate-500 font-medium">
-                    Record payment credits for {selectedLoan.fullName}
+                  <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
+                    Active Portfolio Servicing ({loans.length})
+                  </h2>
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    Record borrower payment entries and audit real-time repayment ledger history
                   </p>
                 </div>
-                <button type="button" onClick={() => setSelectedLoan(null)} className="text-xs text-slate-400 font-bold hover:text-slate-600 cursor-pointer">
+              </div>
+
+              {loading ? (
+                <SkeletonTable rows={4} cols={7} />
+              ) : error ? (
+                <div className="p-6">
+                  <ErrorState message={error} onRetry={() => fetchLoans(true)} />
+                </div>
+              ) : loans.length === 0 ? (
+                <EmptyState
+                  title="No Accounts In Servicing"
+                  description="There are currently no active or disbursed loan accounts in collection servicing."
+                  icon="🏦"
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+                      <tr>
+                        <th className="px-6 py-4">Borrower Name</th>
+                        <th className="px-6 py-4">PAN Card</th>
+                        <th className="px-6 py-4">Total Obligation</th>
+                        <th className="px-6 py-4">Total Paid</th>
+                        <th className="px-6 py-4">Outstanding Balance</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium text-slate-800 dark:text-slate-200">
+                      {loans.map((loan) => (
+                        <tr
+                          key={loan._id}
+                          className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                        >
+                          <td className="px-6 py-4">
+                            <span className="font-extrabold text-slate-900 dark:text-white block">
+                              {loan.fullName}
+                            </span>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                              #{loan._id.slice(-6).toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-mono font-extrabold uppercase text-slate-900 dark:text-slate-200">
+                            {loan.pan}
+                          </td>
+                          <td className="px-6 py-4 font-extrabold text-slate-900 dark:text-white">
+                            ₹{loan.totalRepayment.toLocaleString('en-IN')}
+                          </td>
+                          <td className="px-6 py-4 font-extrabold text-emerald-600 dark:text-emerald-400">
+                            ₹{loan.totalPaid.toLocaleString('en-IN')}
+                          </td>
+                          <td className="px-6 py-4 font-black text-rose-600 dark:text-rose-400">
+                            ₹{loan.outstandingBalance.toLocaleString('en-IN')}
+                          </td>
+                          <td className="px-6 py-4">
+                            <StatusBadge status={loan.status} />
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() => openLoanDetails(loan)}
+                              disabled={loan.status === 'CLOSED'}
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              Record Payment →
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </main>
+        </div>
+
+        {/* Modal */}
+        {selectedLoan && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-xs p-4 overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl p-6 space-y-6 my-8 transition-colors">
+              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    Collection Servicing #{selectedLoan._id.slice(-6).toUpperCase()}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                    Record credit repayments for {selectedLoan.fullName}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLoan(null)}
+                  className="text-xs text-slate-400 font-bold hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                >
                   ✕ Close
                 </button>
               </div>
 
-              {/* Financial Balance Overview Card */}
-              <div className="grid grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl text-center text-xs">
+              <div className="grid grid-cols-3 gap-3 bg-slate-50 dark:bg-slate-950 p-4 rounded-xl text-center text-xs text-slate-800 dark:text-slate-200">
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Repayment</span>
-                  <span className="font-extrabold text-slate-900 text-sm">₹{selectedLoan.totalRepayment.toLocaleString('en-IN')}</span>
+                  <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase block">Total Obligation</span>
+                  <span className="font-extrabold text-slate-900 dark:text-white text-sm">₹{selectedLoan.totalRepayment.toLocaleString('en-IN')}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Paid So Far</span>
-                  <span className="font-extrabold text-emerald-600 text-sm">₹{selectedLoan.totalPaid.toLocaleString('en-IN')}</span>
+                  <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase block">Total Paid So Far</span>
+                  <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">₹{selectedLoan.totalPaid.toLocaleString('en-IN')}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Remaining Balance</span>
-                  <span className="font-black text-rose-600 text-sm">₹{selectedLoan.outstandingBalance.toLocaleString('en-IN')}</span>
+                  <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase block">Remaining Balance</span>
+                  <span className="font-black text-rose-600 dark:text-rose-400 text-sm">₹{selectedLoan.outstandingBalance.toLocaleString('en-IN')}</span>
                 </div>
               </div>
 
-              {/* Payment Entry Form */}
-              <form onSubmit={handleRecordPayment} className="space-y-4 border-t border-b border-slate-100 py-4">
-                <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
-                  Record New Repayment Entry
+              <form onSubmit={handleRecordPayment} className="space-y-4 border-t border-b border-slate-100 dark:border-slate-800 py-4">
+                <h4 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Record Repayment Transaction
                 </h4>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Payment Amount (₹) *
                     </label>
                     <input
@@ -291,34 +301,34 @@ export default function CollectionDashboardPage() {
                       max={selectedLoan.outstandingBalance}
                       value={paymentAmount || ''}
                       onChange={(e) => setPaymentAmount(Number(e.target.value))}
-                      className="w-full p-2.5 rounded-lg border border-slate-300 text-sm font-bold text-slate-900"
+                      className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs font-extrabold outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                      Payment Reference / UTR *
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Unique UTR / Payment Reference *
                     </label>
                     <input
                       type="text"
                       required
                       value={paymentReference}
                       onChange={(e) => setPaymentReference(e.target.value)}
-                      className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-mono font-bold text-slate-900"
+                      className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Collection Remarks (Optional)
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Received via UPI / IMPS from borrower account"
+                    placeholder="e.g. Received via NEFT / UPI transfer."
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
-                    className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-900"
+                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
 
@@ -326,33 +336,38 @@ export default function CollectionDashboardPage() {
                   <button
                     type="submit"
                     disabled={submitting || paymentAmount <= 0 || !paymentReference.trim()}
-                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
                   >
                     {submitting ? 'Recording Payment...' : 'Record Payment & Credit Ledger →'}
                   </button>
                 </div>
               </form>
 
-              {/* Payment Ledger Audit History */}
+              {/* Payment History */}
               <div className="space-y-3">
-                <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                <h4 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
                   Payment History Ledger ({payments.length})
                 </h4>
 
                 {fetchingPayments ? (
                   <div className="p-4 text-center text-slate-400 text-xs font-semibold animate-pulse">
-                    Retrieving payment ledger...
+                    Loading ledger...
                   </div>
                 ) : payments.length === 0 ? (
-                  <div className="p-4 bg-slate-50 rounded-xl text-center text-slate-400 text-xs font-medium">
-                    No payment transactions recorded yet.
+                  <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl text-center text-slate-400 text-xs font-medium">
+                    No payments recorded yet.
                   </div>
                 ) : (
                   <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
                     {payments.map((pmt) => (
-                      <div key={pmt._id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
+                      <div
+                        key={pmt._id}
+                        className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200/80 dark:border-slate-800 flex justify-between items-center text-xs text-slate-800 dark:text-slate-200"
+                      >
                         <div>
-                          <span className="font-bold text-slate-900 block">₹{pmt.amount.toLocaleString('en-IN')}</span>
+                          <span className="font-extrabold text-slate-900 dark:text-white block">
+                            ₹{pmt.amount.toLocaleString('en-IN')}
+                          </span>
                           <span className="text-[10px] font-mono text-slate-400 block">Ref: {pmt.paymentReference}</span>
                         </div>
                         <div className="text-right">
@@ -361,11 +376,9 @@ export default function CollectionDashboardPage() {
                               day: '2-digit',
                               month: 'short',
                               year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
                             })}
                           </span>
-                          <span className="text-[10px] font-bold text-emerald-600 uppercase">Recorded</span>
+                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">Recorded</span>
                         </div>
                       </div>
                     ))}

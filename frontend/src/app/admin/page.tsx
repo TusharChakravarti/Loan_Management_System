@@ -2,17 +2,23 @@
 
 import React, { useEffect, useState } from 'react';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
+import { CredoraSidebar } from '../../components/CredoraSidebar';
 import { OperationsNav } from '../../components/OperationsNav';
+import { PageHeader } from '../../components/PageHeader';
+import { FinancialMetricCard } from '../../components/FinancialMetricCard';
+import { StatusBadge } from '../../components/StatusBadge';
+import { SkeletonCard, SkeletonTable } from '../../components/SkeletonLoader';
+import { ErrorState } from '../../components/ErrorState';
 import { operationsApi } from '../../lib/api';
 import { AdminOverview } from '../../types/operations';
-import { Loan } from '../../types/loan';
-import Link from 'next/link';
+import { UserRole } from '../../types/auth';
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState<AdminOverview | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const fetchOverview = async () => {
     setLoading(true);
@@ -38,147 +44,191 @@ export default function AdminDashboardPage() {
     : [];
 
   return (
-    <ProtectedRoute allowedRoles={['ADMIN']}>
-      <div className="min-h-screen bg-slate-100 pb-12">
-        <OperationsNav
-          title="System Admin Dashboard"
-          subtitle="Full-stack loan portfolio & operations overview"
-        />
+    <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+      <div className="flex min-h-screen bg-slate-50 dark:bg-navy-950 transition-colors duration-200">
+        <CredoraSidebar mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
 
-        <main className="max-w-7xl mx-auto p-6 space-y-6">
-          {loading ? (
-            <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center text-slate-500 animate-pulse text-sm">
-              Loading system metrics...
-            </div>
-          ) : error ? (
-            <div className="bg-white p-8 rounded-2xl border border-rose-200 text-rose-700 text-sm font-bold">
-              {error}
-            </div>
-          ) : data ? (
-            <>
-              {/* Financial Metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Disbursed Volume</span>
-                  <span className="text-2xl font-black text-blue-600 block mt-1">
-                    ₹{data.financials.totalDisbursedAmount.toLocaleString('en-IN')}
-                  </span>
+        <div className="flex-1 flex flex-col min-w-0">
+          <OperationsNav
+            title="System Admin Dashboard"
+            subtitle="Executive operations portfolio & financial audit"
+            onMobileMenuToggle={() => setMobileMenuOpen(true)}
+          />
+
+          <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+            <PageHeader
+              title="Executive Operations Overview"
+              subtitle="Full-stack credit portfolio metrics, status breakdown & master application ledger"
+              badgeText="EXECUTIVE ADMIN"
+            >
+              <button
+                onClick={fetchOverview}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                🔄 Live Refresh
+              </button>
+            </PageHeader>
+
+            {loading ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <SkeletonCard />
+                  <SkeletonCard />
+                  <SkeletonCard />
                 </div>
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Collections Recorded</span>
-                  <span className="text-2xl font-black text-emerald-600 block mt-1">
-                    ₹{data.financials.totalCollectedAmount.toLocaleString('en-IN')}
-                  </span>
-                </div>
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Portfolio Outstanding</span>
-                  <span className="text-2xl font-black text-amber-600 block mt-1">
-                    ₹{data.financials.totalOutstandingAmount.toLocaleString('en-IN')}
-                  </span>
-                </div>
+                <SkeletonTable rows={5} cols={9} />
               </div>
+            ) : error ? (
+              <ErrorState message={error} onRetry={fetchOverview} />
+            ) : data ? (
+              <>
+                {/* Financial Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FinancialMetricCard
+                    title="Total Disbursed Volume"
+                    value={`₹${data.financials.totalDisbursedAmount.toLocaleString('en-IN')}`}
+                    subtitle="Aggregate principal disbursed to date"
+                    icon="💸"
+                    variant="primary"
+                  />
+                  <FinancialMetricCard
+                    title="Total Recovered Capital"
+                    value={`₹${data.financials.totalCollectedAmount.toLocaleString('en-IN')}`}
+                    subtitle="Aggregate borrower repayments collected"
+                    icon="✓"
+                    variant="success"
+                  />
+                  <FinancialMetricCard
+                    title="Portfolio Outstanding Balance"
+                    value={`₹${data.financials.totalOutstandingAmount.toLocaleString('en-IN')}`}
+                    subtitle="Current net active debt balance"
+                    icon="🏦"
+                    variant="warning"
+                  />
+                </div>
 
-              {/* Status Breakdown Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                {[
-                  { label: 'Pending', key: 'PENDING', color: 'bg-amber-100 text-amber-800' },
-                  { label: 'Sanction Desk', key: 'SANCTION_PENDING', color: 'bg-blue-100 text-blue-800' },
-                  { label: 'Disbursement', key: 'DISBURSEMENT_PENDING', color: 'bg-indigo-100 text-indigo-800' },
-                  { label: 'Active', key: 'ACTIVE', color: 'bg-emerald-100 text-emerald-800' },
-                  { label: 'Closed', key: 'CLOSED', color: 'bg-slate-200 text-slate-800' },
-                  { label: 'Rejected', key: 'REJECTED', color: 'bg-rose-100 text-rose-800' },
-                ].map((item) => (
-                  <button
-                    key={item.key}
-                    onClick={() => setFilterStatus(item.key)}
-                    className={`p-3 rounded-xl border border-slate-200 text-left transition-all ${
-                      filterStatus === item.key ? 'ring-2 ring-blue-500 bg-blue-50' : 'bg-white'
-                    }`}
-                  >
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">{item.label}</span>
-                    <span className="text-lg font-extrabold text-slate-900 block mt-0.5">
-                      {data.counts[item.key] || 0}
-                    </span>
-                  </button>
-                ))}
-              </div>
+                {/* Status Distribution Grid */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-3 transition-colors duration-200">
+                  <h3 className="text-xs font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                    Status Distribution Breakdown
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                    {[
+                      { label: 'Pending', key: 'PENDING' },
+                      { label: 'Sanction Desk', key: 'SANCTION_PENDING' },
+                      { label: 'Disbursement', key: 'DISBURSEMENT_PENDING' },
+                      { label: 'Active Servicing', key: 'ACTIVE' },
+                      { label: 'Closed Account', key: 'CLOSED' },
+                      { label: 'Declined File', key: 'REJECTED' },
+                    ].map((item) => (
+                      <button
+                        key={item.key}
+                        onClick={() => setFilterStatus(item.key)}
+                        className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          filterStatus === item.key
+                            ? 'ring-2 ring-credora-500 bg-credora-50 dark:bg-credora-950/60 border-credora-300 dark:border-credora-800'
+                            : 'bg-slate-50/60 dark:bg-slate-950/60 border-slate-200/80 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase block tracking-wider">
+                          {item.label}
+                        </span>
+                        <span className="text-xl font-black text-slate-900 dark:text-white block mt-1">
+                          {data.counts[item.key] || 0}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-              {/* Master Portfolio Applications Table */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900">Master Portfolio Applications</h2>
-                    <p className="text-xs text-slate-500">Filter: {filterStatus}</p>
+                {/* Master Portfolio Table */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-2xs transition-colors duration-200">
+                  <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                      <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
+                        Master Portfolio Ledger
+                      </h2>
+                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        Filter: <span className="font-bold uppercase text-slate-700 dark:text-slate-300">{filterStatus}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setFilterStatus('ALL')}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
+                          filterStatus === 'ALL'
+                            ? 'bg-credora-700 dark:bg-credora-600 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        All Applications ({data.counts.TOTAL})
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setFilterStatus('ALL')}
-                      className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${
-                        filterStatus === 'ALL' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      Show All ({data.counts.TOTAL})
-                    </button>
-                    <button
-                      onClick={fetchOverview}
-                      className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors"
-                    >
-                      Refresh
-                    </button>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-700">
-                    <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200">
-                      <tr>
-                        <th className="p-3">Loan ID</th>
-                        <th className="p-3">Borrower</th>
-                        <th className="p-3">PAN</th>
-                        <th className="p-3">Amount</th>
-                        <th className="p-3">Tenure</th>
-                        <th className="p-3">Total Repayment</th>
-                        <th className="p-3">Outstanding</th>
-                        <th className="p-3">Status</th>
-                        <th className="p-3">Created</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium">
-                      {filteredLoans.map((loan) => (
-                        <tr key={loan._id} className="hover:bg-slate-50 transition-colors">
-                          <td className="p-3 font-mono font-bold text-slate-900">#{loan._id.slice(-6)}</td>
-                          <td className="p-3 font-bold text-slate-800">{loan.fullName}</td>
-                          <td className="p-3 font-mono">{loan.pan}</td>
-                          <td className="p-3 font-bold text-slate-800">₹{loan.loanAmount.toLocaleString('en-IN')}</td>
-                          <td className="p-3">{loan.tenureDays} Days</td>
-                          <td className="p-3 font-bold text-blue-700">₹{loan.totalRepayment.toLocaleString('en-IN')}</td>
-                          <td className="p-3 font-black text-amber-600">₹{loan.outstandingBalance.toLocaleString('en-IN')}</td>
-                          <td className="p-3">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                loan.status === 'CLOSED'
-                                  ? 'bg-slate-200 text-slate-800'
-                                  : loan.status === 'ACTIVE'
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                  : loan.status === 'REJECTED'
-                                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                  : 'bg-amber-100 text-amber-800 border border-amber-200'
-                              }`}
-                            >
-                              {loan.status}
-                            </span>
-                          </td>
-                          <td className="p-3 text-slate-500">{new Date(loan.createdAt).toLocaleDateString()}</td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+                        <tr>
+                          <th className="px-5 py-4">Reference</th>
+                          <th className="px-5 py-4">Borrower</th>
+                          <th className="px-5 py-4">PAN Card</th>
+                          <th className="px-5 py-4">Principal</th>
+                          <th className="px-5 py-4">Tenure</th>
+                          <th className="px-5 py-4">Repayment</th>
+                          <th className="px-5 py-4">Outstanding</th>
+                          <th className="px-5 py-4">Status</th>
+                          <th className="px-5 py-4">Created Date</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium text-slate-800 dark:text-slate-200">
+                        {filteredLoans.map((loan) => (
+                          <tr
+                            key={loan._id}
+                            className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                          >
+                            <td className="px-5 py-4 font-mono font-extrabold text-slate-900 dark:text-white">
+                              #{loan._id.slice(-6).toUpperCase()}
+                            </td>
+                            <td className="px-5 py-4 font-extrabold text-slate-900 dark:text-white">
+                              {loan.fullName}
+                            </td>
+                            <td className="px-5 py-4 font-mono font-extrabold uppercase text-slate-900 dark:text-slate-200">
+                              {loan.pan}
+                            </td>
+                            <td className="px-5 py-4 font-extrabold text-slate-900 dark:text-white">
+                              ₹{loan.loanAmount.toLocaleString('en-IN')}
+                            </td>
+                            <td className="px-5 py-4 font-semibold text-slate-600 dark:text-slate-400">
+                              {loan.tenureDays} Days
+                            </td>
+                            <td className="px-5 py-4 font-extrabold text-credora-600 dark:text-credora-400">
+                              ₹{loan.totalRepayment.toLocaleString('en-IN')}
+                            </td>
+                            <td className="px-5 py-4 font-black text-rose-600 dark:text-rose-400">
+                              ₹{loan.outstandingBalance.toLocaleString('en-IN')}
+                            </td>
+                            <td className="px-5 py-4">
+                              <StatusBadge status={loan.status} />
+                            </td>
+                            <td className="px-5 py-4 text-slate-500 dark:text-slate-400 font-medium">
+                              {new Date(loan.createdAt).toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            </>
-          ) : null}
-        </main>
+              </>
+            ) : null}
+          </main>
+        </div>
       </div>
     </ProtectedRoute>
   );

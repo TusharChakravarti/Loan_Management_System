@@ -4,13 +4,16 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { CredoraLogo } from './CredoraLogo';
+import { ThemeToggle } from './ThemeToggle';
 
 interface OperationsNavProps {
   title: string;
   subtitle: string;
+  onMobileMenuToggle?: () => void;
 }
 
-export const OperationsNav: React.FC<OperationsNavProps> = ({ title, subtitle }) => {
+export const OperationsNav: React.FC<OperationsNavProps> = ({ title, subtitle, onMobileMenuToggle }) => {
   const { user, logout } = useAuth();
   const pathname = usePathname();
 
@@ -25,30 +28,51 @@ export const OperationsNav: React.FC<OperationsNavProps> = ({ title, subtitle })
   const visibleLinks = links.filter((l) => user && (user.role === 'ADMIN' || l.roles.includes(user.role)));
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">{title}</h1>
-            <span className="px-2 py-0.5 text-[10px] font-extrabold rounded bg-blue-100 text-blue-800 uppercase font-mono">
-              Ops Desk
+    <header className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-30 transition-colors duration-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+        {/* Left Branding & Mobile Hamburger */}
+        <div className="flex items-center gap-3">
+          {onMobileMenuToggle && (
+            <button
+              onClick={onMobileMenuToggle}
+              className="md:hidden p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              aria-label="Toggle navigation drawer"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          )}
+
+          <CredoraLogo variant="full" size="sm" />
+
+          <div className="hidden lg:flex flex-col border-l border-slate-200 dark:border-slate-800 pl-3.5 py-0.5">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-sm text-slate-900 dark:text-white leading-none tracking-tight">
+                {title}
+              </span>
+              <span className="px-2 py-0.5 text-[9px] font-extrabold rounded-md bg-credora-50 dark:bg-credora-950/60 text-credora-700 dark:text-credora-300 border border-credora-200 dark:border-credora-800 uppercase tracking-widest">
+                OPS PORTAL
+              </span>
+            </div>
+            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-none">
+              {subtitle}
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
         </div>
 
-        {/* Links Navigation */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Center Role Module Links */}
+        <div className="flex items-center gap-1.5 flex-wrap">
           {visibleLinks.map((link) => {
             const active = pathname === link.href;
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
+                className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all duration-150 ${
                   active
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
+                    ? 'bg-credora-700 dark:bg-credora-600 text-white shadow-2xs'
+                    : 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/60 dark:border-slate-700/60'
                 }`}
               >
                 {link.label}
@@ -57,30 +81,27 @@ export const OperationsNav: React.FC<OperationsNavProps> = ({ title, subtitle })
           })}
         </div>
 
-        {/* User Session Info */}
-        {user && (
-          <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
-            <div className="text-right text-xs">
-              <div className="font-bold text-slate-800">{user.fullName}</div>
-              <div className="text-[10px] text-slate-500 font-mono">{user.email}</div>
+        {/* Right Actions & User Pill */}
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+
+          {user && (
+            <div className="flex items-center gap-2.5 bg-slate-100/80 dark:bg-slate-800/80 p-1.5 px-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+              <div className="text-right text-xs hidden sm:block">
+                <div className="font-extrabold text-slate-900 dark:text-white leading-none">{user.fullName}</div>
+                <div className="text-[9px] font-extrabold text-credora-600 dark:text-credora-400 uppercase mt-0.5 tracking-wider">
+                  {user.role}
+                </div>
+              </div>
+              <button
+                onClick={() => logout()}
+                className="px-2.5 py-1 bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-slate-700 dark:text-slate-200 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+              >
+                Logout
+              </button>
             </div>
-            <span
-              className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded uppercase ${
-                user.role === 'ADMIN'
-                  ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                  : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-              }`}
-            >
-              {user.role}
-            </span>
-            <button
-              onClick={() => logout()}
-              className="px-2.5 py-1 bg-white hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-bold rounded-lg transition-colors"
-            >
-              Logout
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </header>
   );
