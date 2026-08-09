@@ -41,13 +41,13 @@ export const CredoraHeader: React.FC<CredoraHeaderProps> = ({
 
   return (
     <header className="fixed top-0 left-0 right-0 w-full h-16 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors duration-200 shadow-2xs">
-      <div className="w-full h-full px-4 sm:px-6 flex items-center justify-between gap-4">
+      <div className="w-full h-full px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 max-w-full">
         {/* Left Section: Mobile Menu Button + Main CREDORA Logo + Title */}
-        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           {onMobileMenuToggle && (
             <button
               onClick={onMobileMenuToggle}
-              className="md:hidden p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+              className="md:hidden p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors shrink-0"
               aria-label="Open navigation menu"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -65,7 +65,7 @@ export const CredoraHeader: React.FC<CredoraHeaderProps> = ({
                 ? '/admin'
                 : '/operations/sales'
             }
-            className="flex items-center"
+            className="flex items-center shrink-0"
           >
             <CredoraLogo variant="full" size="md" showTagline={false} />
           </Link>
@@ -109,11 +109,11 @@ export const CredoraHeader: React.FC<CredoraHeaderProps> = ({
         )}
 
         {/* Right Section: Theme Toggle & User Info & Sign Out */}
-        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           <ThemeToggle />
 
           {user && (
-            <div className="flex items-center gap-2.5 pl-2.5 sm:pl-3 border-l border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 pl-1.5 sm:pl-3 border-l border-slate-200 dark:border-slate-800 shrink-0">
               <div className="flex flex-col text-right hidden sm:flex">
                 <span className="text-xs font-black text-slate-900 dark:text-white leading-none">
                   {user.fullName}
@@ -125,7 +125,7 @@ export const CredoraHeader: React.FC<CredoraHeaderProps> = ({
 
               <button
                 onClick={logout}
-                className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-slate-700 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all cursor-pointer"
+                className="px-2.5 py-1.5 sm:px-3 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-slate-700 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
               >
                 Sign Out
               </button>
