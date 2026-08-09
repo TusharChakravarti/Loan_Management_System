@@ -51,24 +51,26 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-between selection:bg-credora-600 selection:text-white">
-      {/* Header */}
-      <header className="max-w-7xl mx-auto w-full flex justify-between items-center px-4 sm:px-6 py-4 border-b border-slate-800/80">
-        <CredoraLogo variant="full" size="md" showTagline />
+      {/* Sticky Full-Width Header */}
+      <header className="sticky top-0 z-40 w-full bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex justify-between items-center">
+          <CredoraLogo variant="full" size="md" showTagline />
 
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <Link
-            href="/login"
-            className="px-4 py-2 text-xs font-bold text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all cursor-pointer"
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/register"
-            className="px-4 py-2 text-xs font-bold text-white bg-credora-700 hover:bg-credora-600 rounded-xl shadow-md transition-all cursor-pointer"
-          >
-            Apply Now
-          </Link>
+          <div className="flex items-center gap-1.5 sm:gap-3">
+            <ThemeToggle />
+            <Link
+              href="/login"
+              className="px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all cursor-pointer whitespace-nowrap"
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/register"
+              className="px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold text-white bg-credora-700 hover:bg-credora-600 rounded-xl shadow-md transition-all cursor-pointer whitespace-nowrap"
+            >
+              Apply Now
+            </Link>
+          </div>
         </div>
       </header>
 

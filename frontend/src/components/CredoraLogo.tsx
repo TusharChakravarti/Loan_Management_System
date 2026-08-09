@@ -16,9 +16,9 @@ export const CredoraLogo: React.FC<CredoraLogoProps> = ({
   className = '',
 }) => {
   const sizeClasses = {
-    sm: { icon: 'w-6 h-6', title: 'text-base', subtitle: 'text-[9px]' },
-    md: { icon: 'w-8 h-8', title: 'text-xl', subtitle: 'text-[10px]' },
-    lg: { icon: 'w-10 h-10', title: 'text-2xl', subtitle: 'text-xs' },
+    sm: { icon: 'w-6 h-6', title: 'text-sm sm:text-base', subtitle: 'text-[9px]' },
+    md: { icon: 'w-7 h-7 sm:w-8 sm:h-8', title: 'text-base sm:text-xl', subtitle: 'text-[10px]' },
+    lg: { icon: 'w-9 h-9 sm:w-10 sm:h-10', title: 'text-xl sm:text-2xl', subtitle: 'text-xs' },
   }[size];
 
   return (
