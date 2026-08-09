@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
 import { User, UserRole } from '../models/User.js';
 import { hashPassword, comparePassword } from '../utils/password.js';
 import { generateToken, verifyToken } from '../utils/jwt.js';
@@ -335,13 +336,125 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      res.status(200).json({
+        success: true,
+        message: `If an account exists for ${email}, a password reset link has been dispatched.`,
+      });
+      return;
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 Hour
+    await user.save();
+
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    const resetUrl = `${clientUrl}/reset-password?token=${resetToken}`;
+
+    console.log(`\n======================================================`);
+    console.log(`🔑 PASSWORD RESET LINK FOR: ${user.email}`);
+    console.log(`👉 Direct Reset Link: ${resetUrl}`);
+    console.log(`======================================================\n`);
+
+    // Dispatch real email via Resend API if key is present
+    const resendApiKey = process.env.RESEND_API_KEY?.trim();
+    if (resendApiKey) {
+      try {
+        const fromEmail = process.env.RESEND_FROM_EMAIL || 'Credora Security <onboarding@resend.dev>';
+        const emailRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: fromEmail,
+            to: [user.email],
+            subject: '🔒 Reset Your Credora Account Password',
+            html: `
+              <div style="font-family: Arial, sans-serif; background-color: #0b0f19; color: #ffffff; padding: 32px; border-radius: 16px; max-width: 500px; margin: 0 auto; border: 1px solid #1e293b;">
+                <h2 style="color: #6366f1; margin-bottom: 8px; font-weight: 900; letter-spacing: -0.5px;">CREDORA</h2>
+                <h3 style="color: #ffffff; margin-top: 0;">Reset Your Account Password</h3>
+                <p style="color: #94a3b8; font-size: 14px; line-height: 1.6;">We received a request to reset the password for your Credora account (<strong>${user.email}</strong>).</p>
+                <div style="margin: 28px 0; text-align: center;">
+                  <a href="${resetUrl}" style="background: linear-gradient(135deg, #4f46e5, #6366f1); color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: bold; border-radius: 10px; display: inline-block; font-size: 14px; box-shadow: 0 4px 12px rgba(99,102,241,0.3);">Reset Password →</a>
+                </div>
+                <p style="color: #64748b; font-size: 12px; line-height: 1.5;">This link will expire in 1 hour. If you did not request a password reset, you can safely ignore this email.</p>
+                <hr style="border: none; border-top: 1px solid #1e293b; margin-top: 24px;" />
+                <p style="color: #475569; font-size: 11px; margin-bottom: 0;">© ${new Date().getFullYear()} Credora Financial Technologies Inc. All rights reserved.</p>
+              </div>
+            `,
+          }),
+        });
+
+        const emailData = (await emailRes.json()) as any;
+        if (!emailRes.ok) {
+          console.warn('⚠️ [Resend Email Warning]:', emailData);
+        } else {
+          console.log('✉️ [Resend Password Reset Email Sent Successfully]:', emailData.id);
+        }
+      } catch (resendErr) {
+        console.error('⚠️ [Resend API Dispatch Error]:', resendErr);
+      }
+    }
+
     res.status(200).json({
       success: true,
-      message: `Password reset link has been dispatched to ${email}`,
+      message: `Password reset link generated for ${email}`,
+      resetUrl: process.env.NODE_ENV === 'development' ? resetUrl : undefined,
     });
   } catch (error) {
     console.error('[Forgot Password Error]:', error);
     res.status(500).json({ success: false, message: 'Unable to process password reset request.' });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      res.status(400).json({
+        success: false,
+        message: 'Reset token and new password are required',
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long',
+      });
+      return;
+    }
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() },
+    }).select('+resetPasswordToken +resetPasswordExpires');
+
+    if (!user) {
+      res.status(400).json({
+        success: false,
+        message: 'Password reset token is invalid or has expired. Please request a new link.',
+      });
+      return;
+    }
+
+    user.passwordHash = await hashPassword(newPassword);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully. You may now sign in with your new password.',
+    });
+  } catch (error) {
+    console.error('[Reset Password Error]:', error);
+    res.status(500).json({ success: false, message: 'Unable to reset password. Please try again.' });
   }
 };

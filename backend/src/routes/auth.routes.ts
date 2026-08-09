@@ -8,6 +8,7 @@ import {
   googleCallback,
   setGoogleToken,
   forgotPassword,
+  resetPassword,
 } from '../controllers/auth.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 
@@ -18,10 +19,11 @@ router.post('/auth/login', login);
 router.get('/auth/me', authenticate, getMe);
 router.post('/auth/logout', logout);
 
-// Google OAuth & Forgot Password routes
+// Google OAuth & Password Reset routes
 router.get('/auth/google', googleAuthInit);
 router.get('/auth/google/callback', googleCallback);
 router.post('/auth/google/token', setGoogleToken);
 router.post('/auth/forgot-password', forgotPassword);
+router.post('/auth/reset-password', resetPassword);
 
 export default router;

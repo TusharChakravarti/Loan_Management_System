@@ -9,6 +9,7 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState<string>('');
   const [isPending, setIsPending] = useState<boolean>(false);
   const [sent, setSent] = useState<boolean>(false);
+  const [demoResetUrl, setDemoResetUrl] = useState<string | null>(null);
   const [error, setError] = useState<string>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -16,8 +17,11 @@ export default function ForgotPasswordPage() {
     setError('');
     setIsPending(true);
     try {
-      await authApi.forgotPassword(email);
+      const res = await authApi.forgotPassword(email);
       setSent(true);
+      if (res.resetUrl) {
+        setDemoResetUrl(res.resetUrl);
+      }
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
@@ -49,6 +53,24 @@ export default function ForgotPasswordPage() {
                 <span className="text-credora-400 font-bold">{email}</span>
               </p>
             </div>
+
+            {demoResetUrl && (
+              <div className="w-full bg-credora-950/60 border border-credora-800 p-4 rounded-2xl space-y-2 text-left">
+                <span className="text-[10px] font-extrabold text-credora-400 uppercase tracking-widest block">
+                  🔑 Instant Demo Link (Local Testing Mode)
+                </span>
+                <p className="text-[11px] text-slate-300">
+                  Since SMTP is running in dev mode, click below to set your new password directly:
+                </p>
+                <a
+                  href={demoResetUrl}
+                  className="block w-full text-center py-2 bg-credora-600 hover:bg-credora-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-xs"
+                >
+                  Proceed to Reset Password →
+                </a>
+              </div>
+            )}
+
             <p className="text-[11px] text-slate-500 leading-relaxed">
               Link expires in 1 hour. Didn't get it?{' '}
               <button

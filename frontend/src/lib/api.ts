@@ -127,10 +127,17 @@ export const authApi = {
     return data;
   },
 
-  forgotPassword: async (email: string): Promise<{ success: boolean; message: string }> => {
+  forgotPassword: async (email: string): Promise<{ success: boolean; message: string; resetUrl?: string }> => {
     return await apiFetch('/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email }),
+    });
+  },
+
+  resetPassword: async (token: string, newPassword: string): Promise<{ success: boolean; message: string }> => {
+    return await apiFetch('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
     });
   },
 
