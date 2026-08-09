@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { ProtectedRoute } from '../../../../components/ProtectedRoute';
 import { BorrowerNav } from '../../../../components/BorrowerNav';
+import { DocumentPreviewModal } from '../../../../components/DocumentPreviewModal';
 import { loanApi } from '../../../../lib/api';
 import { Loan } from '../../../../types/loan';
 import { useParams } from 'next/navigation';
@@ -16,6 +17,13 @@ export default function SingleLoanDetailPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [fetchingDoc, setFetchingDoc] = useState<boolean>(false);
+
+  // Modal State
+  const [previewModalOpen, setPreviewModalOpen] = useState<boolean>(false);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewFileName, setPreviewFileName] = useState<string>('');
+  const [previewIsImage, setPreviewIsImage] = useState<boolean>(false);
+  const [previewLoading, setPreviewLoading] = useState<boolean>(false);
 
   // Real-time backend re-validation on mount & window focus
   const fetchLoan = async () => {
@@ -43,15 +51,27 @@ export default function SingleLoanDetailPage() {
     };
   }, [id]);
 
-  // Same-tab document viewing handler using secure authenticated binary preview stream
+  // Document viewing handler opening in-page modal overlay
   const handleViewSalarySlip = async (loanId: string) => {
     setFetchingDoc(true);
+    setPreviewLoading(true);
+    setPreviewFileName(loan?.salarySlipOriginalName || 'SalarySlip.pdf');
+    setPreviewModalOpen(true);
+
     try {
-      await loanApi.previewSalarySlip(loanId);
+      const res = await loanApi.fetchSalarySlipBlob(loanId);
+      if (res && res.blob) {
+        const url = URL.createObjectURL(res.blob);
+        setPreviewBlobUrl(url);
+        setPreviewFileName(res.fileName);
+        setPreviewIsImage(res.isImage);
+      }
     } catch (err: any) {
       alert(err.message || 'Failed to retrieve salary slip document');
+      setPreviewModalOpen(false);
     } finally {
       setFetchingDoc(false);
+      setPreviewLoading(false);
     }
   };
 
@@ -279,7 +299,7 @@ export default function SingleLoanDetailPage() {
                       <button
                         onClick={() => handleViewSalarySlip(loan._id)}
                         disabled={fetchingDoc}
-                        className="font-bold text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-50 text-xs inline-flex items-center gap-1"
+                        className="font-bold text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-50 text-xs inline-flex items-center gap-1 cursor-pointer"
                       >
                         <span>{fetchingDoc ? 'Opening Document...' : loan.salarySlipOriginalName}</span>
                         <span>↗</span>
@@ -292,6 +312,16 @@ export default function SingleLoanDetailPage() {
           ) : null}
         </main>
       </div>
+
+      {/* Reusable In-Page Document Preview Modal Overlay */}
+      <DocumentPreviewModal
+        isOpen={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        fileName={previewFileName}
+        blobUrl={previewBlobUrl}
+        isImage={previewIsImage}
+        isLoading={previewLoading}
+      />
     </ProtectedRoute>
   );
 }

@@ -168,86 +168,48 @@ export const loanApi = {
   },
 
   /**
-   * SECURE AUTHENTICATED DOCUMENT PREVIEW HANDLER
-   * Sends Authorization: Bearer <token> header to backend streaming endpoint.
-   * Parses Content-Disposition header for original filename, validates binary blob,
-   * and renders preview with object-fit: contain (images) or iframe (PDFs) in the SAME TAB (window.location.href).
+   * AUTHENTICATED BINARY SALARY SLIP FETCH
+   * Sends Authorization: Bearer <token> to backend proxy endpoint and returns raw blob + metadata
    */
-  previewSalarySlip: async (loanId: string): Promise<void> => {
+  fetchSalarySlipBlob: async (loanId: string): Promise<{ blob: Blob; fileName: string; isImage: boolean }> => {
     const token = getAuthToken();
     if (!token) {
-      alert('Authentication required to preview document.');
-      return;
+      throw new Error('Authentication required to preview document.');
     }
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/loans/${loanId}/salary-slip/preview`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+    const response = await fetch(`${API_BASE_URL}/loans/${loanId}/salary-slip/preview`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-      if (!response.ok) {
-        alert('Unable to preview salary slip. Please try again.');
-        return;
-      }
-
-      // Extract filename from Content-Disposition header
-      let fileName = `Salary_Slip_${loanId.slice(-6)}.pdf`;
-      const disposition = response.headers.get('Content-Disposition');
-      if (disposition && disposition.includes('filename=')) {
-        const match = disposition.match(/filename="?([^";]+)"?/);
-        if (match && match[1]) {
-          fileName = match[1];
-        }
-      }
-
-      const blob = await response.blob();
-
-      // Validate blob size & type
-      if (!blob || blob.size === 0) {
-        alert('Unable to preview salary slip. Please try again.');
-        return;
-      }
-
-      const isImage = blob.type.startsWith('image/') || /\.(jpg|jpeg|png)$/i.test(fileName);
-      const docBlobUrl = URL.createObjectURL(blob);
-
-      let htmlBodyContent = `<iframe src="${docBlobUrl}"></iframe>`;
-      let bodyStyles = `margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #525659;`;
-
-      if (isImage) {
-        bodyStyles = `margin: 0; padding: 0; width: 100%; min-height: 100vh; background-color: #0f172a; display: flex; align-items: center; justify-content: center; overflow: auto;`;
-        htmlBodyContent = `<div style="display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;max-width:100%;">
-          <img src="${docBlobUrl}" alt="${fileName}" style="max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.5);" />
-        </div>`;
-      }
-
-      const htmlContent = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>${fileName}</title>
-    <style>
-      html, body { ${bodyStyles} }
-      iframe { width: 100%; height: 100%; border: none; }
-    </style>
-  </head>
-  <body>
-    ${htmlBodyContent}
-  </body>
-</html>`;
-
-      const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
-      const htmlBlobUrl = URL.createObjectURL(htmlBlob);
-
-      // Same-tab navigation (NO _blank, NO window.open, NO raw Cloudinary URL bypass)
-      window.location.href = htmlBlobUrl;
-    } catch (err: any) {
-      console.error('[Document Preview Exception]', err);
-      alert('Unable to preview salary slip. Please try again.');
+    if (!response.ok) {
+      throw new Error('Unable to preview salary slip. Please try again.');
     }
+
+    let fileName = `Salary_Slip_${loanId.slice(-6)}.pdf`;
+    const disposition = response.headers.get('Content-Disposition');
+    if (disposition && disposition.includes('filename=')) {
+      const match = disposition.match(/filename="?([^";]+)"?/);
+      if (match && match[1]) {
+        fileName = match[1];
+      }
+    }
+
+    const blob = await response.blob();
+    if (!blob || blob.size === 0) {
+      throw new Error('Unable to preview salary slip. Please try again.');
+    }
+
+    const isImage = blob.type.startsWith('image/') || /\.(jpg|jpeg|png)$/i.test(fileName);
+    return { blob, fileName, isImage };
+  },
+
+  previewSalarySlip: async (loanId: string): Promise<void> => {
+    const res = await loanApi.fetchSalarySlipBlob(loanId);
+    const docBlobUrl = URL.createObjectURL(res.blob);
+    window.location.href = docBlobUrl;
   },
 
   getSalarySlipUrl: async (loanId: string): Promise<{ url: string; originalName: string }> => {

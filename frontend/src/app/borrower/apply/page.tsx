@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
 import { BorrowerNav } from '../../../components/BorrowerNav';
+import { DocumentPreviewModal } from '../../../components/DocumentPreviewModal';
 import { useAuth } from '../../../context/AuthContext';
 import { loanApi } from '../../../lib/api';
 import { BREResult, EmploymentMode, Loan } from '../../../types/loan';
@@ -39,13 +40,65 @@ export default function ApplyLoanPage() {
   // Loan Configuration State
   const [loanAmount, setLoanAmount] = useState<number>(100000);
   const [tenureDays, setTenureDays] = useState<number>(180);
-  const [interestMonthly, setInterestMonthly] = useState<number>(1); // Dynamic monthly rate slider (1% per month = 12% p.a.)
+  const [interestMonthly, setInterestMonthly] = useState<number>(1);
 
   // Submission State
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittedLoan, setSubmittedLoan] = useState<Loan | null>(null);
   const [fetchingDoc, setFetchingDoc] = useState<boolean>(false);
+
+  // Modal State
+  const [previewModalOpen, setPreviewModalOpen] = useState<boolean>(false);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewFileName, setPreviewFileName] = useState<string>('');
+  const [previewIsImage, setPreviewIsImage] = useState<boolean>(false);
+  const [previewLoading, setPreviewLoading] = useState<boolean>(false);
+
+  // Helper for step navigation & browser location history synchronization
+  const goToStep = (targetStep: number, pushHistory = true) => {
+    setStep(targetStep);
+    if (pushHistory && typeof window !== 'undefined') {
+      window.history.pushState({ step: targetStep }, '', `/borrower/apply?step=${targetStep}`);
+    }
+  };
+
+  useEffect(() => {
+    // Read step from URL on initial load if present
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const stepParam = searchParams.get('step');
+      if (stepParam) {
+        const parsed = Number(stepParam);
+        if (parsed >= 1 && parsed <= 6) {
+          setStep(parsed);
+        }
+      }
+    }
+
+    // Sync browser Back/Forward buttons with wizard steps
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && typeof e.state.step === 'number') {
+        setStep(e.state.step);
+      } else if (typeof window !== 'undefined') {
+        const searchParams = new URLSearchParams(window.location.search);
+        const stepParam = searchParams.get('step');
+        if (stepParam) {
+          const parsed = Number(stepParam);
+          if (parsed >= 1 && parsed <= 6) {
+            setStep(parsed);
+            return;
+          }
+        }
+        setStep(1);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   // Dynamic Calculation Math based on selected interestMonthly state
   const interestAnnual = (interestMonthly || 1) * 12;
@@ -73,7 +126,7 @@ export default function ApplyLoanPage() {
         employmentMode,
       });
       setBreResult(res);
-      setStep(2);
+      goToStep(2);
     } catch (err: any) {
       alert(err.message || 'BRE evaluation failed');
     } finally {
@@ -93,7 +146,7 @@ export default function ApplyLoanPage() {
       setUploadedResourceType(res.salarySlipResourceType || '');
       setUploadedFormat(res.salarySlipFormat || '');
       setUploadedName(res.originalName || selectedFile.name);
-      setStep(4);
+      goToStep(4);
     } catch (err: any) {
       setUploadError(err.message || 'Unable to upload salary slip file. Please try again.');
     } finally {
@@ -101,57 +154,45 @@ export default function ApplyLoanPage() {
     }
   };
 
-  // Pre-Submission Local Browser Document Preview Handler (Same-Tab Navigation)
+  // Pre-Submission Document Preview Handler (Opens Sleek In-Page Modal Overlay)
   const handlePreviewDocument = () => {
-    if (selectedFile) {
-      const docBlobUrl = URL.createObjectURL(selectedFile);
-      const fileName = selectedFile.name;
-      const isImage = selectedFile.type.startsWith('image/') || /\.(jpg|jpeg|png)$/i.test(fileName);
-
-      let htmlBodyContent = `<iframe src="${docBlobUrl}"></iframe>`;
-      let bodyStyles = `margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #525659;`;
-
-      if (isImage) {
-        bodyStyles = `margin: 0; padding: 0; width: 100%; min-height: 100vh; background-color: #0f172a; display: flex; align-items: center; justify-content: center; overflow: auto;`;
-        htmlBodyContent = `<div style="display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;max-width:100%;">
-          <img src="${docBlobUrl}" alt="${fileName}" style="max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.5);" />
-        </div>`;
-      }
-
-      const htmlContent = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>${fileName}</title>
-    <style>
-      html, body { ${bodyStyles} }
-      iframe { width: 100%; height: 100%; border: none; }
-    </style>
-  </head>
-  <body>
-    ${htmlBodyContent}
-  </body>
-</html>`;
-
-      const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
-      const htmlBlobUrl = URL.createObjectURL(htmlBlob);
-
-      // Navigate in SAME TAB (NO _blank, NO window.open)
-      window.location.href = htmlBlobUrl;
-    } else {
+    if (!selectedFile) {
       alert('No document file selected for preview.');
+      return;
     }
+
+    const docBlobUrl = URL.createObjectURL(selectedFile);
+    const fileName = selectedFile.name;
+    const isImg = selectedFile.type.startsWith('image/') || /\.(jpg|jpeg|png)$/i.test(fileName);
+
+    setPreviewFileName(fileName);
+    setPreviewBlobUrl(docBlobUrl);
+    setPreviewIsImage(isImg);
+    setPreviewLoading(false);
+    setPreviewModalOpen(true);
   };
 
-  // Post-Submission Authenticated Document Preview Handler (Same-Tab Navigation)
+  // Post-Submission Authenticated Document Preview Handler
   const handlePreviewSubmittedDocument = async (loanId: string) => {
     setFetchingDoc(true);
+    setPreviewLoading(true);
+    setPreviewFileName(submittedLoan?.salarySlipOriginalName || 'SalarySlip.pdf');
+    setPreviewModalOpen(true);
+
     try {
-      await loanApi.previewSalarySlip(loanId);
+      const docRes = await loanApi.fetchSalarySlipBlob(loanId);
+      if (docRes && docRes.blob) {
+        const url = URL.createObjectURL(docRes.blob);
+        setPreviewBlobUrl(url);
+        setPreviewFileName(docRes.fileName);
+        setPreviewIsImage(docRes.isImage);
+      }
     } catch (err: any) {
       alert(err.message || 'Failed to preview salary slip document');
+      setPreviewModalOpen(false);
     } finally {
       setFetchingDoc(false);
+      setPreviewLoading(false);
     }
   };
 
@@ -175,7 +216,7 @@ export default function ApplyLoanPage() {
         tenureDays,
       });
       setSubmittedLoan(res.loan);
-      setStep(6);
+      goToStep(6);
     } catch (err: any) {
       setSubmitError(err.message || 'Loan submission failed. Please try again.');
     } finally {
@@ -211,7 +252,16 @@ export default function ApplyLoanPage() {
                 const active = step === stepNum;
                 const completed = step > stepNum;
                 return (
-                  <div key={label} className="flex items-center gap-2">
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      if (completed || active) {
+                        goToStep(stepNum);
+                      }
+                    }}
+                    className={`flex items-center gap-2 text-left ${completed ? 'cursor-pointer' : 'cursor-default'}`}
+                  >
                     <span
                       className={`h-6 w-6 rounded-full flex items-center justify-center font-bold text-[10px] ${
                         completed
@@ -224,7 +274,7 @@ export default function ApplyLoanPage() {
                       {stepNum}
                     </span>
                     <span className={active ? 'text-slate-900 font-bold' : 'hidden md:inline'}>{label}</span>
-                  </div>
+                  </button>
                 );
               }
             )}
@@ -338,14 +388,14 @@ export default function ApplyLoanPage() {
                     </div>
                     <div className="pt-4 flex justify-between items-center">
                       <button
-                        onClick={() => setStep(1)}
+                        onClick={() => goToStep(1)}
                         className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-bold text-xs rounded-lg hover:bg-slate-50 transition-colors"
                       >
                         ← Edit Info
                       </button>
 
                       <button
-                        onClick={() => setStep(3)}
+                        onClick={() => goToStep(3)}
                         className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-lg transition-colors"
                       >
                         Proceed to Salary Slip Upload →
@@ -381,7 +431,7 @@ export default function ApplyLoanPage() {
 
                     <div className="pt-2 flex justify-between items-center">
                       <button
-                        onClick={() => setStep(1)}
+                        onClick={() => goToStep(1)}
                         className="px-4 py-2 bg-white border border-rose-300 text-rose-700 font-bold text-xs rounded-lg hover:bg-rose-100 transition-colors"
                       >
                         ← Modify Info
@@ -430,7 +480,7 @@ export default function ApplyLoanPage() {
                   <div className="flex justify-between items-center pt-4">
                     <button
                       type="button"
-                      onClick={() => setStep(2)}
+                      onClick={() => goToStep(2)}
                       className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200"
                     >
                       ← Back
@@ -449,7 +499,7 @@ export default function ApplyLoanPage() {
               </div>
             )}
 
-            {/* STEP 4: Interactive Loan Calculator (Real-Time Dynamic Interest Rate Calculations) */}
+            {/* STEP 4: Interactive Loan Calculator */}
             {step === 4 && (
               <div className="space-y-6">
                 <h2 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">
@@ -488,7 +538,7 @@ export default function ApplyLoanPage() {
                         />
                       </div>
 
-                      {/* 2. Interest (In Months) - Real-time Recalculation Binding */}
+                      {/* 2. Interest (In Months) */}
                       <div className="space-y-3">
                         <div className="flex justify-between items-center">
                           <div className="flex items-center gap-1.5">
@@ -553,7 +603,7 @@ export default function ApplyLoanPage() {
                       </div>
                     </div>
 
-                    {/* Right Summary Column with Dynamic Interest Output */}
+                    {/* Right Summary Column */}
                     <div className="lg:col-span-5 bg-white p-7 sm:p-8 rounded-2xl shadow-xs border border-slate-100 space-y-6">
                       <div className="space-y-4 text-sm font-medium text-slate-700">
                         <div className="flex justify-between items-center">
@@ -584,8 +634,8 @@ export default function ApplyLoanPage() {
 
                       <button
                         type="button"
-                        onClick={() => setStep(5)}
-                        className="w-full py-4 bg-[#0066ff] hover:bg-blue-700 text-white font-black text-base rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.99] flex items-center justify-center gap-2"
+                        onClick={() => goToStep(5)}
+                        className="w-full py-4 bg-[#0066ff] hover:bg-blue-700 text-white font-black text-base rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
                       >
                         <span>Apply for Loan →</span>
                       </button>
@@ -596,8 +646,8 @@ export default function ApplyLoanPage() {
                 <div className="flex justify-start pt-2">
                   <button
                     type="button"
-                    onClick={() => setStep(3)}
-                    className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200"
+                    onClick={() => goToStep(3)}
+                    className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 cursor-pointer"
                   >
                     ← Back to Salary Slip Upload
                   </button>
@@ -633,8 +683,8 @@ export default function ApplyLoanPage() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => setStep(1)}
-                        className="text-[11px] font-bold text-blue-600 hover:underline"
+                        onClick={() => goToStep(1)}
+                        className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
                       >
                         Edit
                       </button>
@@ -656,8 +706,8 @@ export default function ApplyLoanPage() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => setStep(4)}
-                        className="text-[11px] font-bold text-blue-600 hover:underline"
+                        onClick={() => goToStep(4)}
+                        className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
                       >
                         Configure
                       </button>
@@ -682,8 +732,8 @@ export default function ApplyLoanPage() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => setStep(3)}
-                      className="text-[11px] font-bold text-blue-600 hover:underline"
+                      onClick={() => goToStep(3)}
+                      className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
                     >
                       Reupload
                     </button>
@@ -707,7 +757,7 @@ export default function ApplyLoanPage() {
                     <button
                       type="button"
                       onClick={handlePreviewDocument}
-                      className="px-3.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5"
+                      className="px-3.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
                       <span>Preview Document</span>
                       <span>↗</span>
@@ -719,8 +769,8 @@ export default function ApplyLoanPage() {
                 <div className="flex justify-between items-center pt-2">
                   <button
                     type="button"
-                    onClick={() => setStep(4)}
-                    className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200"
+                    onClick={() => goToStep(4)}
+                    className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 cursor-pointer"
                   >
                     ← Back
                   </button>
@@ -729,7 +779,7 @@ export default function ApplyLoanPage() {
                     type="button"
                     disabled={submitting}
                     onClick={handleFinalSubmit}
-                    className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-lg shadow-sm disabled:opacity-50 transition-colors"
+                    className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
                   >
                     {submitting ? 'Submitting Application...' : 'Confirm & Submit Application'}
                   </button>
@@ -765,7 +815,7 @@ export default function ApplyLoanPage() {
                     <div className="space-y-1.5 text-slate-800">
                       <p><strong className="text-slate-500 font-semibold">Requested Amount:</strong> ₹{submittedLoan.loanAmount.toLocaleString('en-IN')}</p>
                       <p><strong className="text-slate-500 font-semibold">Tenure:</strong> {submittedLoan.tenureDays} Days</p>
-                      <p><strong className="text-slate-500 font-semibold">Interest Rate:</strong> 12% p.a. (Fixed)</p>
+                      <p><strong className="text-slate-500 font-semibold">Interest Rate:</strong> {submittedLoan.interestRate}% p.a. (Fixed)</p>
                       <p><strong className="text-slate-500 font-semibold">Simple Interest:</strong> ₹{submittedLoan.simpleInterest.toLocaleString('en-IN')}</p>
                       <p className="text-sm font-black text-blue-700 pt-1">
                         Total Repayment: ₹{submittedLoan.totalRepayment.toLocaleString('en-IN')}
@@ -798,7 +848,7 @@ export default function ApplyLoanPage() {
                     type="button"
                     disabled={fetchingDoc}
                     onClick={() => handlePreviewSubmittedDocument(submittedLoan._id)}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                   >
                     <span>{fetchingDoc ? 'Opening Document...' : 'Salary Slip Document'}</span>
                     <span>↗</span>
@@ -826,6 +876,16 @@ export default function ApplyLoanPage() {
           </div>
         </div>
       </div>
+
+      {/* Reusable In-Page Document Preview Modal Overlay */}
+      <DocumentPreviewModal
+        isOpen={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        fileName={previewFileName}
+        blobUrl={previewBlobUrl}
+        isImage={previewIsImage}
+        isLoading={previewLoading}
+      />
     </ProtectedRoute>
   );
 }
