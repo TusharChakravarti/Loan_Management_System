@@ -121,17 +121,17 @@ export default function SalesDashboardPage() {
 
   return (
     <ProtectedRoute allowedRoles={[UserRole.SALES, UserRole.ADMIN]}>
-      <div className="flex min-h-screen bg-slate-50 dark:bg-navy-950 transition-colors duration-200">
-        <CredoraSidebar mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
+      <div className="min-h-screen bg-slate-50 dark:bg-navy-950 transition-colors duration-200">
+        <OperationsNav
+          title="Sales Desk Module"
+          subtitle="Preliminary verification & document review"
+          onMobileMenuToggle={() => setMobileMenuOpen(true)}
+        />
 
-        <div className="flex-1 flex flex-col min-w-0">
-          <OperationsNav
-            title="Sales Desk Module"
-            subtitle="Preliminary verification & document review"
-            onMobileMenuToggle={() => setMobileMenuOpen(true)}
-          />
+        <div className="flex pt-16 min-h-screen">
+          <CredoraSidebar mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
 
-          <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-8 space-y-6">
             <PageHeader
               title="Sales Review Queue"
               subtitle="Verify salary slip uploads, income credentials & route to Sanction Desk"

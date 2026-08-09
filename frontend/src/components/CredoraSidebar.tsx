@@ -52,19 +52,7 @@ export const CredoraSidebar: React.FC<CredoraSidebarProps> = ({
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border-r border-slate-200 dark:border-slate-800 selection:bg-credora-600 selection:text-white transition-colors duration-200">
-      {/* Header Branding */}
-      <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-        <CredoraLogo variant="full" size="md" showTagline />
-        {onMobileClose && (
-          <button
-            onClick={onMobileClose}
-            className="md:hidden text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-1"
-            aria-label="Close menu"
-          >
-            ✕
-          </button>
-        )}
-      </div>
+  
 
       {/* Navigation Links */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-1.5">

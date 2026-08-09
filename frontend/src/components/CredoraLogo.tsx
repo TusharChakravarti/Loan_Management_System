@@ -65,9 +65,9 @@ export const CredoraLogo: React.FC<CredoraLogoProps> = ({
               CREDORA
             </span>
           </div>
-          {(showTagline || variant === 'full') && (
+          {showTagline && (
             <span
-              className={`font-bold tracking-widest text-slate-500 dark:text-slate-400 uppercase mt-0.5 ${sizeClasses.subtitle}`}
+              className={`font-bold tracking-widest text-slate-500 dark:text-slate-400 uppercase mt-0.5 whitespace-nowrap ${sizeClasses.subtitle}`}
             >
               Smarter Lending. Trusted Decisions.
             </span>
