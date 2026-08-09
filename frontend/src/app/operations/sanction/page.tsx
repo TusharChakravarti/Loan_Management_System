@@ -36,6 +36,8 @@ export default function SanctionDashboardPage() {
   const [previewIsImage, setPreviewIsImage] = useState<boolean>(false);
   const [previewLoading, setPreviewLoading] = useState<boolean>(false);
 
+  const [searchTerm, setSearchTerm] = useState<string>('');
+
   const fetchLoans = async (showLoading = true) => {
     if (showLoading) setLoading(true);
     setError(null);
@@ -48,6 +50,16 @@ export default function SanctionDashboardPage() {
       if (showLoading) setLoading(false);
     }
   };
+
+  const filteredLoans = loans.filter((l) => {
+    const term = searchTerm.toLowerCase().trim();
+    return (
+      !term ||
+      l.fullName.toLowerCase().includes(term) ||
+      l.pan.toLowerCase().includes(term) ||
+      l._id.toLowerCase().includes(term)
+    );
+  });
 
   useEffect(() => {
     fetchLoans(true);
@@ -165,13 +177,37 @@ export default function SanctionDashboardPage() {
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-2xs transition-colors duration-200">
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800">
-                <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
-                  Sanction Assessment Queue ({loans.length})
-                </h2>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Review applicant profiles & sales notes to confirm credit sanctioning
-                </p>
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                    <span>Sanction Assessment Queue</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-credora-100 dark:bg-credora-900/80 text-credora-700 dark:text-credora-300">
+                      {filteredLoans.length} of {loans.length}
+                    </span>
+                  </h2>
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    Review applicant profiles & sales notes to confirm credit sanctioning
+                  </p>
+                </div>
+
+                {/* Search Bar */}
+                <div className="relative w-full sm:w-64">
+                  <input
+                    type="text"
+                    placeholder="🔍 Search name, PAN, ref..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-3 pr-8 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs font-medium outline-none focus:ring-2 focus:ring-credora-500 transition-colors"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
 
               {loading ? (
@@ -180,11 +216,25 @@ export default function SanctionDashboardPage() {
                 <div className="p-6">
                   <ErrorState message={error} onRetry={() => fetchLoans(true)} />
                 </div>
-              ) : loans.length === 0 ? (
+              ) : filteredLoans.length === 0 ? (
                 <EmptyState
-                  title="Sanction Queue Clear"
-                  description="There are currently no verified loan files awaiting credit sanction decision."
+                  title={searchTerm ? 'No Matching Applications' : 'Sanction Queue Clear'}
+                  description={
+                    searchTerm
+                      ? `No applications matched "${searchTerm}". Try clearing your search filter.`
+                      : 'There are currently no verified loan files awaiting credit sanction decision.'
+                  }
                   icon="⚖️"
+                  action={
+                    searchTerm ? (
+                      <button
+                        onClick={() => setSearchTerm('')}
+                        className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                      >
+                        Clear Search Filter
+                      </button>
+                    ) : undefined
+                  }
                 />
               ) : (
                 <div className="overflow-x-auto">
@@ -200,7 +250,7 @@ export default function SanctionDashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium text-slate-800 dark:text-slate-200">
-                      {loans.map((loan) => (
+                      {filteredLoans.map((loan) => (
                         <tr
                           key={loan._id}
                           className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"

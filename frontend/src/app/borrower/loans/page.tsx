@@ -59,9 +59,23 @@ export default function BorrowerLoansPage() {
     };
   }, []);
 
+  const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+
   const totalRequested = loans.reduce((acc, curr) => acc + curr.loanAmount, 0);
   const totalOutstanding = loans.reduce((acc, curr) => acc + (curr.outstandingBalance || 0), 0);
   const activeCount = loans.filter((l) => ['ACTIVE', 'DISBURSED'].includes(l.status)).length;
+
+  const filteredLoans = loans.filter((l) => {
+    const matchesStatus = filterStatus === 'ALL' || l.status === filterStatus;
+    const term = searchTerm.toLowerCase().trim();
+    const matchesSearch =
+      !term ||
+      l.loanAmount.toString().includes(term) ||
+      l.status.toLowerCase().includes(term) ||
+      l._id.toLowerCase().includes(term);
+    return matchesStatus && matchesSearch;
+  });
 
   return (
     <ProtectedRoute allowedRoles={['BORROWER']}>
@@ -126,21 +140,73 @@ export default function BorrowerLoansPage() {
 
             {/* Applications Table Card */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-2xs transition-colors duration-200">
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                 <div>
-                  <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
-                    Submitted Applications ({loans.length})
+                  <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                    <span>Submitted Applications</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-credora-100 dark:bg-credora-900/80 text-credora-700 dark:text-credora-300">
+                      {filteredLoans.length} of {loans.length}
+                    </span>
                   </h2>
                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                     Real-time status synced with Credora Decision Engine
                   </p>
                 </div>
-                <button
-                  onClick={() => fetchLoans(true)}
-                  className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg transition-colors cursor-pointer"
-                >
-                  🔄 Live Refresh
-                </button>
+
+                <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+                  {/* Search Bar */}
+                  <div className="relative flex-1 sm:w-56">
+                    <input
+                      type="text"
+                      placeholder="🔍 Search amount or ref..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-3 pr-8 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs font-medium outline-none focus:ring-2 focus:ring-credora-500 transition-colors"
+                    />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Status Filter */}
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs font-bold outline-none focus:ring-2 focus:ring-credora-500 cursor-pointer shadow-2xs transition-colors"
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="PENDING">Pending Review</option>
+                    <option value="SANCTION_PENDING">Sanction Risk Desk</option>
+                    <option value="DISBURSEMENT_PENDING">Disbursement Pending</option>
+                    <option value="ACTIVE">Active / Disbursed</option>
+                    <option value="CLOSED">Closed Accounts</option>
+                    <option value="REJECTED">Declined Files</option>
+                  </select>
+
+                  {(filterStatus !== 'ALL' || searchTerm) && (
+                    <button
+                      onClick={() => {
+                        setFilterStatus('ALL');
+                        setSearchTerm('');
+                      }}
+                      className="px-3 py-2 text-xs font-bold rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-100 transition-colors cursor-pointer"
+                    >
+                      Clear ✕
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => fetchLoans(true)}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  >
+                    🔄 Refresh
+                  </button>
+                </div>
               </div>
 
               {loading ? (
@@ -149,17 +215,33 @@ export default function BorrowerLoansPage() {
                 <div className="p-6">
                   <ErrorState message={error} onRetry={() => fetchLoans(true)} />
                 </div>
-              ) : loans.length === 0 ? (
+              ) : filteredLoans.length === 0 ? (
                 <EmptyState
-                  title="No Active Applications Found"
-                  description="You currently have no active loan applications. Click below to start your quick instant loan application."
+                  title={searchTerm || filterStatus !== 'ALL' ? 'No Matching Applications' : 'No Active Applications Found'}
+                  description={
+                    searchTerm || filterStatus !== 'ALL'
+                      ? 'No applications matched your search or status filter. Try clearing your filters.'
+                      : 'You currently have no active loan applications. Click below to start your quick instant loan application.'
+                  }
                   action={
-                    <Link
-                      href="/borrower/apply"
-                      className="px-5 py-2.5 bg-credora-700 hover:bg-credora-800 text-white font-bold text-xs rounded-xl shadow-xs inline-block"
-                    >
-                      Start Application →
-                    </Link>
+                    searchTerm || filterStatus !== 'ALL' ? (
+                      <button
+                        onClick={() => {
+                          setFilterStatus('ALL');
+                          setSearchTerm('');
+                        }}
+                        className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                      >
+                        Clear Filters
+                      </button>
+                    ) : (
+                      <Link
+                        href="/borrower/apply"
+                        className="px-5 py-2.5 bg-credora-700 hover:bg-credora-800 text-white font-bold text-xs rounded-xl shadow-xs inline-block"
+                      >
+                        Start Application →
+                      </Link>
+                    )
                   }
                 />
               ) : (
@@ -176,7 +258,7 @@ export default function BorrowerLoansPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium text-slate-800 dark:text-slate-200">
-                      {loans.map((loan) => (
+                      {filteredLoans.map((loan) => (
                         <tr
                           key={loan._id}
                           className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"

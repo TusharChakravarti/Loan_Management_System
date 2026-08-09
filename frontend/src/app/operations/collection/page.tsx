@@ -33,6 +33,9 @@ export default function CollectionDashboardPage() {
   const [remarks, setRemarks] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
 
+  const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+
   const fetchLoans = async (showLoading = true) => {
     if (showLoading) setLoading(true);
     setError(null);
@@ -45,6 +48,17 @@ export default function CollectionDashboardPage() {
       if (showLoading) setLoading(false);
     }
   };
+
+  const filteredLoans = loans.filter((l) => {
+    const matchesStatus = filterStatus === 'ALL' || l.status === filterStatus;
+    const term = searchTerm.toLowerCase().trim();
+    const matchesSearch =
+      !term ||
+      l.fullName.toLowerCase().includes(term) ||
+      l.pan.toLowerCase().includes(term) ||
+      l._id.toLowerCase().includes(term);
+    return matchesStatus && matchesSearch;
+  });
 
   useEffect(() => {
     fetchLoans(true);
@@ -163,14 +177,61 @@ export default function CollectionDashboardPage() {
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-2xs transition-colors duration-200">
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                 <div>
-                  <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
-                    Active Portfolio Servicing ({loans.length})
+                  <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                    <span>Active Portfolio Servicing</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-credora-100 dark:bg-credora-900/80 text-credora-700 dark:text-credora-300">
+                      {filteredLoans.length} of {loans.length}
+                    </span>
                   </h2>
                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                     Record borrower payment entries and audit real-time repayment ledger history
                   </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+                  {/* Search Bar */}
+                  <div className="relative flex-1 sm:w-64">
+                    <input
+                      type="text"
+                      placeholder="🔍 Search name, PAN, ref..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-3 pr-8 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs font-medium outline-none focus:ring-2 focus:ring-credora-500 transition-colors"
+                    />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Status Filter */}
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs font-bold outline-none focus:ring-2 focus:ring-credora-500 cursor-pointer shadow-2xs transition-colors"
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="ACTIVE">Active / Disbursed</option>
+                    <option value="CLOSED">Closed Accounts</option>
+                  </select>
+
+                  {(filterStatus !== 'ALL' || searchTerm) && (
+                    <button
+                      onClick={() => {
+                        setFilterStatus('ALL');
+                        setSearchTerm('');
+                      }}
+                      className="px-3 py-2 text-xs font-bold rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-100 transition-colors cursor-pointer"
+                    >
+                      Clear Filters ✕
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -180,11 +241,28 @@ export default function CollectionDashboardPage() {
                 <div className="p-6">
                   <ErrorState message={error} onRetry={() => fetchLoans(true)} />
                 </div>
-              ) : loans.length === 0 ? (
+              ) : filteredLoans.length === 0 ? (
                 <EmptyState
-                  title="No Accounts In Servicing"
-                  description="There are currently no active or disbursed loan accounts in collection servicing."
+                  title={searchTerm || filterStatus !== 'ALL' ? 'No Matching Accounts' : 'No Accounts In Servicing'}
+                  description={
+                    searchTerm || filterStatus !== 'ALL'
+                      ? 'No collection accounts matched your filter criteria. Try clearing your filters.'
+                      : 'There are currently no active or disbursed loan accounts in collection servicing.'
+                  }
                   icon="🏦"
+                  action={
+                    searchTerm || filterStatus !== 'ALL' ? (
+                      <button
+                        onClick={() => {
+                          setFilterStatus('ALL');
+                          setSearchTerm('');
+                        }}
+                        className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                      >
+                        Clear Filters
+                      </button>
+                    ) : undefined
+                  }
                 />
               ) : (
                 <div className="overflow-x-auto">
@@ -201,7 +279,7 @@ export default function CollectionDashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium text-slate-800 dark:text-slate-200">
-                      {loans.map((loan) => (
+                      {filteredLoans.map((loan) => (
                         <tr
                           key={loan._id}
                           className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
