@@ -5,7 +5,7 @@ import { ProtectedRoute } from '../../../components/ProtectedRoute';
 import { BorrowerNav } from '../../../components/BorrowerNav';
 import { useAuth } from '../../../context/AuthContext';
 import { loanApi } from '../../../lib/api';
-import { BREResult, EmploymentMode } from '../../../types/loan';
+import { BREResult, EmploymentMode, Loan } from '../../../types/loan';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -15,7 +15,7 @@ export default function ApplyLoanPage() {
 
   const [step, setStep] = useState<number>(1);
 
-  // Form State (Clean initialization without hardcoded test demo data)
+  // Form State
   const [fullName, setFullName] = useState<string>(user?.fullName || '');
   const [pan, setPan] = useState<string>('');
   const [dateOfBirth, setDateOfBirth] = useState<string>('');
@@ -43,6 +43,8 @@ export default function ApplyLoanPage() {
   // Submission State
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submittedLoan, setSubmittedLoan] = useState<Loan | null>(null);
+  const [fetchingDoc, setFetchingDoc] = useState<boolean>(false);
 
   // Calculation Math
   const interestRate = 12;
@@ -131,7 +133,19 @@ export default function ApplyLoanPage() {
     }
   };
 
-  // Step 5: Final Loan Submission
+  // Post-Submission Authenticated Document Preview Handler
+  const handlePreviewSubmittedDocument = async (loanId: string) => {
+    setFetchingDoc(true);
+    try {
+      await loanApi.previewSalarySlip(loanId);
+    } catch (err: any) {
+      alert(err.message || 'Failed to preview salary slip document');
+    } finally {
+      setFetchingDoc(false);
+    }
+  };
+
+  // Step 5: Final Loan Submission -> Step 6: Receipt & Confirmation
   const handleFinalSubmit = async () => {
     setSubmitting(true);
     setSubmitError(null);
@@ -150,7 +164,8 @@ export default function ApplyLoanPage() {
         loanAmount,
         tenureDays,
       });
-      router.push(`/borrower/loans/${res.loan._id}`);
+      setSubmittedLoan(res.loan);
+      setStep(6);
     } catch (err: any) {
       setSubmitError(err.message || 'Loan submission failed. Please try again.');
     } finally {
@@ -180,27 +195,29 @@ export default function ApplyLoanPage() {
 
           {/* Stepper Progress Bar */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center text-xs font-semibold text-slate-600">
-            {['1. Personal Info', '2. BRE Check', '3. Salary Slip', '4. Configure', '5. Review'].map((label, idx) => {
-              const stepNum = idx + 1;
-              const active = step === stepNum;
-              const completed = step > stepNum;
-              return (
-                <div key={label} className="flex items-center gap-2">
-                  <span
-                    className={`h-6 w-6 rounded-full flex items-center justify-center font-bold text-[10px] ${
-                      completed
-                        ? 'bg-emerald-500 text-white'
-                        : active
-                        ? 'bg-blue-600 text-white ring-2 ring-blue-200'
-                        : 'bg-slate-100 text-slate-400'
-                    }`}
-                  >
-                    {stepNum}
-                  </span>
-                  <span className={active ? 'text-slate-900 font-bold' : 'hidden md:inline'}>{label}</span>
-                </div>
-              );
-            })}
+            {['1. Personal Info', '2. BRE Check', '3. Salary Slip', '4. Configure', '5. Review', '6. Receipt'].map(
+              (label, idx) => {
+                const stepNum = idx + 1;
+                const active = step === stepNum;
+                const completed = step > stepNum;
+                return (
+                  <div key={label} className="flex items-center gap-2">
+                    <span
+                      className={`h-6 w-6 rounded-full flex items-center justify-center font-bold text-[10px] ${
+                        completed
+                          ? 'bg-emerald-500 text-white'
+                          : active
+                          ? 'bg-blue-600 text-white ring-2 ring-blue-200'
+                          : 'bg-slate-100 text-slate-400'
+                      }`}
+                    >
+                      {stepNum}
+                    </span>
+                    <span className={active ? 'text-slate-900 font-bold' : 'hidden md:inline'}>{label}</span>
+                  </div>
+                );
+              }
+            )}
           </div>
 
           {/* Wizard Content */}
@@ -647,6 +664,93 @@ export default function ApplyLoanPage() {
                   >
                     {submitting ? 'Submitting Application...' : 'Confirm & Submit Application'}
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 6: Confirmation Receipt Screen */}
+            {step === 6 && submittedLoan && (
+              <div className="space-y-6">
+                <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-3 text-center">
+                  <div className="h-12 w-12 rounded-full bg-emerald-500 text-white font-black text-2xl flex items-center justify-center mx-auto">
+                    ✓
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-emerald-950">Application Submitted Successfully!</h2>
+                    <p className="text-xs text-emerald-700 font-semibold mt-1">
+                      Your loan request has been registered and assigned for Sales verification.
+                    </p>
+                  </div>
+                  <div className="inline-block bg-white px-4 py-1.5 rounded-full border border-emerald-200 font-mono text-xs font-bold text-emerald-800 shadow-xs">
+                    Application ID: #{submittedLoan._id.slice(-6).toUpperCase()}
+                  </div>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  {/* Financial Summary */}
+                  <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                    <span className="font-bold text-slate-700 uppercase tracking-wider text-[11px] block border-b border-slate-200 pb-2">
+                      Loan Structure
+                    </span>
+                    <div className="space-y-1.5 text-slate-800">
+                      <p><strong className="text-slate-500 font-semibold">Requested Amount:</strong> ₹{submittedLoan.loanAmount.toLocaleString('en-IN')}</p>
+                      <p><strong className="text-slate-500 font-semibold">Tenure:</strong> {submittedLoan.tenureDays} Days</p>
+                      <p><strong className="text-slate-500 font-semibold">Interest Rate:</strong> 12% p.a. (Fixed)</p>
+                      <p><strong className="text-slate-500 font-semibold">Simple Interest:</strong> ₹{submittedLoan.simpleInterest.toLocaleString('en-IN')}</p>
+                      <p className="text-sm font-black text-blue-700 pt-1">
+                        Total Repayment: ₹{submittedLoan.totalRepayment.toLocaleString('en-IN')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Applicant Details */}
+                  <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                    <span className="font-bold text-slate-700 uppercase tracking-wider text-[11px] block border-b border-slate-200 pb-2">
+                      Applicant Info
+                    </span>
+                    <div className="space-y-1.5 text-slate-800">
+                      <p><strong className="text-slate-500 font-semibold">Full Name:</strong> {submittedLoan.fullName}</p>
+                      <p><strong className="text-slate-500 font-semibold">PAN Card:</strong> <span className="font-mono uppercase">{submittedLoan.pan}</span></p>
+                      <p><strong className="text-slate-500 font-semibold">Monthly Salary:</strong> ₹{submittedLoan.monthlySalary.toLocaleString('en-IN')}</p>
+                      <p><strong className="text-slate-500 font-semibold">Status:</strong> <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold uppercase">{submittedLoan.status}</span></p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Uploaded Document Card with Post-Submission Preview Button */}
+                <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <div className="space-y-1 text-xs">
+                    <span className="text-slate-500 font-semibold block">Uploaded Salary Slip Document</span>
+                    <span className="font-bold text-slate-900 block">📄 {submittedLoan.salarySlipOriginalName}</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={fetchingDoc}
+                    onClick={() => handlePreviewSubmittedDocument(submittedLoan._id)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <span>{fetchingDoc ? 'Opening Document...' : 'Salary Slip Document'}</span>
+                    <span>↗</span>
+                  </button>
+                </div>
+
+                {/* Navigation Buttons */}
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-4 border-t border-slate-200">
+                  <Link
+                    href="/borrower/loans"
+                    className="w-full sm:w-auto text-center px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors"
+                  >
+                    ← View All Your Loan Applications
+                  </Link>
+
+                  <Link
+                    href={`/borrower/loans/${submittedLoan._id}`}
+                    className="w-full sm:w-auto text-center px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-colors shadow-sm"
+                  >
+                    View Application Tracking Details →
+                  </Link>
                 </div>
               </div>
             )}

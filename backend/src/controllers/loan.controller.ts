@@ -242,8 +242,10 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
 
     const fileName = loan.salarySlipOriginalName || `salary-slip-${loan._id}${ext || '.pdf'}`;
 
-    // 1. Check if document is stored locally on disk (Legacy records only)
-    if (loan.salarySlipUrl.startsWith('/uploads/salary-slips/')) {
+    const isHttpUrl = loan.salarySlipUrl.startsWith('http://') || loan.salarySlipUrl.startsWith('https://');
+
+    // 1. Check if document reference is a local relative file path (Legacy records)
+    if (!isHttpUrl) {
       const sanitizedFilename = path.basename(loan.salarySlipUrl);
       const filePath = path.join(process.cwd(), 'uploads', 'salary-slips', sanitizedFilename);
 
@@ -253,10 +255,17 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
         res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
         res.sendFile(filePath);
         return;
+      } else {
+        console.error(`[Salary Slip Preview] Legacy local document file not found on disk: ${filePath}`);
+        res.status(404).json({
+          success: false,
+          message: 'Unable to preview salary slip. Document file not found.',
+        });
+        return;
       }
     }
 
-    // 2. Server-side fetch from stored Cloudinary URL directly
+    // 2. Server-side fetch from Cloudinary HTTP/HTTPS delivery URL
     const targetUrl = loan.salarySlipUrl;
     const docFetchRes = await fetch(targetUrl);
 
