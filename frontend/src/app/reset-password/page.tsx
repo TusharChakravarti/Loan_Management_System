@@ -49,8 +49,12 @@ function ResetPasswordFormContent() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4 py-8 font-sans transition-colors duration-200">
-      <div className="w-full max-w-md bg-slate-900/90 border border-slate-800/80 rounded-3xl p-8 shadow-2xl backdrop-blur-xl flex flex-col space-y-6">
+    <div className="min-h-screen flex flex-col justify-between p-4 sm:p-8 bg-slate-50 dark:bg-navy-950 transition-colors duration-200 selection:bg-credora-600 selection:text-white">
+      <div className="max-w-md w-full mx-auto flex justify-end">
+        <ThemeToggle />
+      </div>
+
+      <div className="w-full max-w-md mx-auto my-auto bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-3xl p-8 shadow-xl backdrop-blur-xl flex flex-col space-y-6">
         <div className="flex justify-center mb-2">
           <CredoraLogo showTagline={false} size="lg" />
         </div>
@@ -58,15 +62,15 @@ function ResetPasswordFormContent() {
         {success ? (
           <div className="flex flex-col items-center text-center space-y-5 py-4">
             <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-              <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg className="w-8 h-8 text-emerald-500 dark:text-emerald-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
             <div>
-              <h2 className="text-xl font-black text-white tracking-tight">
+              <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
                 Password Reset Complete!
               </h2>
-              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">
                 Your Credora account password has been updated successfully.
               </p>
             </div>
@@ -80,23 +84,23 @@ function ResetPasswordFormContent() {
         ) : (
           <>
             <div>
-              <h2 className="text-xl font-black text-white tracking-tight">
+              <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
                 Set New Password
               </h2>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
                 Please enter your new password below to secure your Credora account.
               </p>
             </div>
 
             {error && (
-              <div className="bg-rose-950/60 border border-rose-900/80 rounded-xl p-3.5 text-rose-300 text-xs font-bold">
+              <div className="bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900/80 rounded-xl p-3.5 text-rose-800 dark:text-rose-300 text-xs font-bold">
                 {error}
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-[11px] font-extrabold text-slate-300 uppercase tracking-wider mb-2">
+                <label className="block text-[11px] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                   New Password
                 </label>
                 <div className="relative">
@@ -107,12 +111,12 @@ function ResetPasswordFormContent() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={6}
-                    className="w-full px-4 py-3 bg-slate-950/80 border border-slate-800 rounded-xl text-white text-xs font-medium outline-none focus:border-credora-500 focus:ring-1 focus:ring-credora-500 transition-colors"
+                    className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white text-xs font-medium outline-none focus:border-credora-500 focus:ring-1 focus:ring-credora-500 transition-colors"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-xs font-bold"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-xs font-bold"
                   >
                     {showPassword ? 'Hide' : 'Show'}
                   </button>
@@ -120,7 +124,7 @@ function ResetPasswordFormContent() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-extrabold text-slate-300 uppercase tracking-wider mb-2">
+                <label className="block text-[11px] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                   Confirm New Password
                 </label>
                 <input
@@ -130,7 +134,7 @@ function ResetPasswordFormContent() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   minLength={6}
-                  className="w-full px-4 py-3 bg-slate-950/80 border border-slate-800 rounded-xl text-white text-xs font-medium outline-none focus:border-credora-500 focus:ring-1 focus:ring-credora-500 transition-colors"
+                  className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white text-xs font-medium outline-none focus:border-credora-500 focus:ring-1 focus:ring-credora-500 transition-colors"
                 />
               </div>
 

@@ -30,8 +30,12 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4 py-8 font-sans transition-colors duration-200">
-      <div className="w-full max-w-md bg-slate-900/90 border border-slate-800/80 rounded-3xl p-8 shadow-2xl backdrop-blur-xl flex flex-col space-y-6">
+    <div className="min-h-screen flex flex-col justify-between p-4 sm:p-8 bg-slate-50 dark:bg-navy-950 transition-colors duration-200 selection:bg-credora-600 selection:text-white">
+      <div className="max-w-md w-full mx-auto flex justify-end">
+        <ThemeToggle />
+      </div>
+
+      <div className="w-full max-w-md mx-auto my-auto bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-3xl p-8 shadow-xl backdrop-blur-xl flex flex-col space-y-6">
         <div className="flex justify-center mb-2">
           <CredoraLogo showTagline={false} size="lg" />
         </div>
@@ -39,18 +43,18 @@ export default function ForgotPasswordPage() {
         {sent ? (
           <div className="flex flex-col items-center text-center space-y-5 py-4">
             <div className="w-16 h-16 rounded-2xl bg-credora-500/10 border border-credora-500/30 flex items-center justify-center">
-              <svg className="w-8 h-8 text-credora-400" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+              <svg className="w-8 h-8 text-credora-500 dark:text-credora-400" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
                 <path d="M3 8l9 6 9-6" />
                 <rect x="3" y="6" width="18" height="13" rx="2" />
               </svg>
             </div>
             <div>
-              <h2 className="text-xl font-black text-white tracking-tight">
+              <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
                 Reset link sent!
               </h2>
-              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">
                 We sent a password reset link to<br />
-                <span className="text-credora-400 font-bold">{email}</span>
+                <span className="text-credora-600 dark:text-credora-400 font-bold">{email}</span>
               </p>
             </div>
 
