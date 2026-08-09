@@ -91,18 +91,19 @@ export default function SingleLoanDetailPage() {
     }
   };
 
-  const getStageIndex = (status: string, outstanding: number, totalRepayment: number) => {
+  const getStageIndex = (status: string) => {
     switch (status) {
       case 'PENDING':
         return 1;
       case 'SALES_REVIEW':
-      case 'SANCTION_PENDING':
         return 2;
+      case 'SANCTION_PENDING':
+        return 3;
       case 'SANCTIONED':
       case 'DISBURSEMENT_PENDING':
-        return 3;
+        return 4;
       case 'ACTIVE':
-        return outstanding < totalRepayment ? 5 : 4;
+        return 5;
       case 'CLOSED':
         return 6;
       case 'REJECTED':
@@ -120,7 +121,7 @@ export default function SingleLoanDetailPage() {
     { num: 6, label: 'Closed' },
   ];
 
-  const currentStageIndex = loan ? getStageIndex(loan.status, loan.outstandingBalance, loan.totalRepayment) : 1;
+  const currentStageIndex = loan ? getStageIndex(loan.status) : 1;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
