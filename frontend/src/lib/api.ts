@@ -168,10 +168,10 @@ export const loanApi = {
   },
 
   /**
-   * AUTHENTICATED BINARY DOCUMENT PREVIEW HANDLER
+   * AUTHENTICATED SAME-TAB BINARY DOCUMENT PREVIEW HANDLER
    * Sends Authorization: Bearer <token> header to backend streaming endpoint.
    * Parses Content-Disposition header for original filename, validates binary blob,
-   * and renders preview in a new browser tab with image aspect ratio & PDF formatting preserved.
+   * and renders preview in the SAME TAB (window.location.href) so browser Back works naturally.
    */
   previewSalarySlip: async (loanId: string): Promise<void> => {
     const token = getAuthToken();
@@ -180,12 +180,16 @@ export const loanApi = {
       return;
     }
 
-    // Safe diagnostic log (No actual JWT logged)
-    console.log('[Salary Slip Preview]', {
-      hasToken: Boolean(token),
-      loanId,
-      endpoint: `${API_BASE_URL}/loans/${loanId}/salary-slip/preview`,
-    });
+    // Try authorized signed URL first for direct same-tab navigation
+    try {
+      const docRes = await loanApi.getSalarySlipUrl(loanId);
+      if (docRes && docRes.url) {
+        window.location.href = docRes.url;
+        return;
+      }
+    } catch {
+      // Fallback to fetch binary blob and same-tab navigate
+    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/loans/${loanId}/salary-slip/preview`, {
@@ -249,12 +253,8 @@ export const loanApi = {
       const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
       const htmlBlobUrl = URL.createObjectURL(htmlBlob);
 
-      window.open(htmlBlobUrl, '_blank', 'noopener,noreferrer');
-
-      setTimeout(() => {
-        URL.revokeObjectURL(htmlBlobUrl);
-        URL.revokeObjectURL(docBlobUrl);
-      }, 60000);
+      // Same-tab navigation (NO _blank, NO window.open)
+      window.location.href = htmlBlobUrl;
     } catch (err: any) {
       console.error('[Document Preview Exception]', err);
       alert('Unable to preview salary slip. Please try again.');

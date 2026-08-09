@@ -98,7 +98,7 @@ export default function ApplyLoanPage() {
     }
   };
 
-  // Pre-Submission Local Browser Document Preview Handler (With Object-Fit Contain Image Viewer)
+  // Pre-Submission Local Browser Document Preview Handler (Same-Tab Navigation)
   const handlePreviewDocument = () => {
     if (selectedFile) {
       const docBlobUrl = URL.createObjectURL(selectedFile);
@@ -133,18 +133,14 @@ export default function ApplyLoanPage() {
       const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
       const htmlBlobUrl = URL.createObjectURL(htmlBlob);
 
-      window.open(htmlBlobUrl, '_blank', 'noopener,noreferrer');
-
-      setTimeout(() => {
-        URL.revokeObjectURL(htmlBlobUrl);
-        URL.revokeObjectURL(docBlobUrl);
-      }, 60000);
+      // Navigate in SAME TAB (NO _blank, NO window.open)
+      window.location.href = htmlBlobUrl;
     } else {
       alert('No document file selected for preview.');
     }
   };
 
-  // Post-Submission Authenticated Document Preview Handler
+  // Post-Submission Authenticated Document Preview Handler (Same-Tab Navigation)
   const handlePreviewSubmittedDocument = async (loanId: string) => {
     setFetchingDoc(true);
     try {
