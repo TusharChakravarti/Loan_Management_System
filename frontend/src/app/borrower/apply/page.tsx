@@ -39,7 +39,7 @@ export default function ApplyLoanPage() {
   // Loan Configuration State
   const [loanAmount, setLoanAmount] = useState<number>(100000);
   const [tenureDays, setTenureDays] = useState<number>(180);
-  const [interestMonthly, setInterestMonthly] = useState<number>(1);
+  const [interestMonthly, setInterestMonthly] = useState<number>(1); // Dynamic monthly rate slider (1% per month = 12% p.a.)
 
   // Submission State
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -47,8 +47,8 @@ export default function ApplyLoanPage() {
   const [submittedLoan, setSubmittedLoan] = useState<Loan | null>(null);
   const [fetchingDoc, setFetchingDoc] = useState<boolean>(false);
 
-  // Calculation Math
-  const interestAnnual = 12; // Authoritative Fixed 12% p.a.
+  // Dynamic Calculation Math based on selected interestMonthly state
+  const interestAnnual = (interestMonthly || 1) * 12;
   const numericSalary = typeof monthlySalary === 'number' ? monthlySalary : 0;
   const simpleInterest = Math.round(((loanAmount * interestAnnual * tenureDays) / (365 * 100)) * 100) / 100;
   const totalRepayment = Math.round((loanAmount + simpleInterest) * 100) / 100;
@@ -449,7 +449,7 @@ export default function ApplyLoanPage() {
               </div>
             )}
 
-            {/* STEP 4: Interactive Loan Calculator (Matches Reference UI) */}
+            {/* STEP 4: Interactive Loan Calculator (Real-Time Dynamic Interest Rate Calculations) */}
             {step === 4 && (
               <div className="space-y-6">
                 <h2 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">
@@ -488,7 +488,7 @@ export default function ApplyLoanPage() {
                         />
                       </div>
 
-                      {/* 2. Interest (In Months) */}
+                      {/* 2. Interest (In Months) - Real-time Recalculation Binding */}
                       <div className="space-y-3">
                         <div className="flex justify-between items-center">
                           <div className="flex items-center gap-1.5">
@@ -499,10 +499,13 @@ export default function ApplyLoanPage() {
                             <input
                               type="number"
                               min={0.5}
-                              max={3}
+                              max={5}
                               step={0.1}
-                              value={interestMonthly || 1}
-                              onChange={(e) => setInterestMonthly(Number(e.target.value))}
+                              value={interestMonthly || ''}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                if (!isNaN(val)) setInterestMonthly(Math.min(5, Math.max(0.1, val)));
+                              }}
                               className="w-16 text-right font-black text-slate-900 outline-hidden bg-transparent"
                             />
                             <span className="ml-2 text-slate-400 text-sm font-semibold">%</span>
@@ -511,7 +514,7 @@ export default function ApplyLoanPage() {
                         <input
                           type="range"
                           min={0.5}
-                          max={3}
+                          max={5}
                           step={0.1}
                           value={interestMonthly}
                           onChange={(e) => setInterestMonthly(Number(e.target.value))}
@@ -550,7 +553,7 @@ export default function ApplyLoanPage() {
                       </div>
                     </div>
 
-                    {/* Right Summary Column */}
+                    {/* Right Summary Column with Dynamic Interest Output */}
                     <div className="lg:col-span-5 bg-white p-7 sm:p-8 rounded-2xl shadow-xs border border-slate-100 space-y-6">
                       <div className="space-y-4 text-sm font-medium text-slate-700">
                         <div className="flex justify-between items-center">
@@ -564,7 +567,10 @@ export default function ApplyLoanPage() {
                         </div>
 
                         <div className="flex justify-between items-center">
-                          <span>Total Interest</span>
+                          <div className="flex flex-col">
+                            <span>Total Interest</span>
+                            <span className="text-[10px] text-blue-600 font-bold">({interestMonthly}%/mo = {interestAnnual}% p.a.)</span>
+                          </div>
                           <span className="font-black text-slate-900 text-base">₹{simpleInterest.toLocaleString('en-IN')}</span>
                         </div>
 
@@ -659,7 +665,7 @@ export default function ApplyLoanPage() {
                     <div className="space-y-1.5 text-slate-800">
                       <p><strong className="text-slate-500 font-semibold">Requested Amount:</strong> ₹{loanAmount.toLocaleString('en-IN')}</p>
                       <p><strong className="text-slate-500 font-semibold">Tenure Duration:</strong> {tenureDays} Days</p>
-                      <p><strong className="text-slate-500 font-semibold">Interest Rate:</strong> 12% p.a. (Fixed)</p>
+                      <p><strong className="text-slate-500 font-semibold">Interest Rate:</strong> {interestMonthly}%/mo ({interestAnnual}% p.a.)</p>
                       <p><strong className="text-slate-500 font-semibold">Simple Interest:</strong> ₹{simpleInterest.toLocaleString('en-IN')}</p>
                       <p className="text-sm font-black text-blue-700 pt-1">
                         Total Repayment: ₹{totalRepayment.toLocaleString('en-IN')}
