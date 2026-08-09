@@ -98,11 +98,22 @@ export default function ApplyLoanPage() {
     }
   };
 
-  // Pre-Submission Local Browser Document Preview Handler
+  // Pre-Submission Local Browser Document Preview Handler (With Object-Fit Contain Image Viewer)
   const handlePreviewDocument = () => {
     if (selectedFile) {
-      const pdfBlobUrl = URL.createObjectURL(selectedFile);
+      const docBlobUrl = URL.createObjectURL(selectedFile);
       const fileName = selectedFile.name;
+      const isImage = selectedFile.type.startsWith('image/') || /\.(jpg|jpeg|png)$/i.test(fileName);
+
+      let htmlBodyContent = `<iframe src="${docBlobUrl}"></iframe>`;
+      let bodyStyles = `margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #525659;`;
+
+      if (isImage) {
+        bodyStyles = `margin: 0; padding: 0; width: 100%; min-height: 100vh; background-color: #0f172a; display: flex; align-items: center; justify-content: center; overflow: auto;`;
+        htmlBodyContent = `<div style="display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;max-width:100%;">
+          <img src="${docBlobUrl}" alt="${fileName}" style="max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.5);" />
+        </div>`;
+      }
 
       const htmlContent = `<!DOCTYPE html>
 <html>
@@ -110,12 +121,12 @@ export default function ApplyLoanPage() {
     <meta charset="utf-8" />
     <title>${fileName}</title>
     <style>
-      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #525659; }
+      html, body { ${bodyStyles} }
       iframe { width: 100%; height: 100%; border: none; }
     </style>
   </head>
   <body>
-    <iframe src="${pdfBlobUrl}"></iframe>
+    ${htmlBodyContent}
   </body>
 </html>`;
 
@@ -126,7 +137,7 @@ export default function ApplyLoanPage() {
 
       setTimeout(() => {
         URL.revokeObjectURL(htmlBlobUrl);
-        URL.revokeObjectURL(pdfBlobUrl);
+        URL.revokeObjectURL(docBlobUrl);
       }, 60000);
     } else {
       alert('No document file selected for preview.');
