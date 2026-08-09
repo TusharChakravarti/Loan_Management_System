@@ -20,10 +20,10 @@ router.get('/auth/me', authenticate, getMe);
 router.post('/auth/logout', logout);
 
 // Google OAuth & Password Reset routes
-router.get('/auth/google', googleAuthInit);
-router.get('/auth/google/callback', googleCallback);
-router.post('/auth/google/token', setGoogleToken);
-router.post('/auth/forgot-password', forgotPassword);
-router.post('/auth/reset-password', resetPassword);
+router.get(`${process.env.BACKEND_URL}/auth/google`, googleAuthInit);
+router.get(`${process.env.BACKEND_URL}/auth/google/callback`, googleCallback);
+router.post(`${process.env.BACKEND_URL}/auth/google/token`, setGoogleToken);
+router.post(`${process.env.BACKEND_URL}/auth/forgot-password`, forgotPassword);
+router.post(`${process.env.BACKEND_URL}/auth/reset-password`, resetPassword);
 
 export default router;
