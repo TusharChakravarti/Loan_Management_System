@@ -3,7 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
 import { OperationsNav } from '../../../components/OperationsNav';
+import { DocumentPreviewModal } from '../../../components/DocumentPreviewModal';
 import { operationsApi, loanApi } from '../../../lib/api';
+import { broadcastLoanUpdate, subscribeToLoanUpdates } from '../../../lib/events';
 import { Loan } from '../../../types/loan';
 
 export default function SanctionDashboardPage() {
@@ -17,8 +19,15 @@ export default function SanctionDashboardPage() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [fetchingDoc, setFetchingDoc] = useState<boolean>(false);
 
-  const fetchLoans = async () => {
-    setLoading(true);
+  // Document Preview Modal State
+  const [previewModalOpen, setPreviewModalOpen] = useState<boolean>(false);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewFileName, setPreviewFileName] = useState<string>('');
+  const [previewIsImage, setPreviewIsImage] = useState<boolean>(false);
+  const [previewLoading, setPreviewLoading] = useState<boolean>(false);
+
+  const fetchLoans = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError(null);
     try {
       const res = await operationsApi.getSanctionLoans();
@@ -26,12 +35,34 @@ export default function SanctionDashboardPage() {
     } catch (err: any) {
       setError(err.message || 'Failed to load Sanction queue');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLoans();
+    fetchLoans(true);
+
+    // 1. Silent Auto-Polling Heartbeat (3s)
+    const interval = setInterval(() => {
+      fetchLoans(false);
+    }, 3000);
+
+    // 2. Live Cross-Tab Event Subscription
+    const unsubscribe = subscribeToLoanUpdates(() => {
+      fetchLoans(false);
+    });
+
+    // 3. Window Focus & Visibility Change Listeners
+    const handleFocus = () => fetchLoans(false);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
   }, []);
 
   const handleSanctionAction = async (action: 'APPROVE' | 'REJECT') => {
@@ -42,13 +73,15 @@ export default function SanctionDashboardPage() {
       let res;
       if (action === 'APPROVE') {
         res = await operationsApi.approveSanctionLoan(selectedLoan._id, { remarks });
+        broadcastLoanUpdate({ type: 'SANCTION_APPROVED', loanId: selectedLoan._id });
       } else {
         res = await operationsApi.rejectSanctionLoan(selectedLoan._id, { remarks });
+        broadcastLoanUpdate({ type: 'SANCTION_REJECTED', loanId: selectedLoan._id });
       }
       setActionSuccess(res.message);
       setSelectedLoan(null);
       setRemarks('');
-      await fetchLoans();
+      await fetchLoans(false);
     } catch (err: any) {
       alert(err.message || 'Failed to execute Sanction action');
     } finally {
@@ -56,14 +89,26 @@ export default function SanctionDashboardPage() {
     }
   };
 
-  const handleViewSalarySlip = async (loanId: string) => {
+  const handleViewSalarySlip = async (loanId: string, defaultName: string) => {
     setFetchingDoc(true);
+    setPreviewLoading(true);
+    setPreviewFileName(defaultName || 'SalarySlip.pdf');
+    setPreviewModalOpen(true);
+
     try {
-      await loanApi.previewSalarySlip(loanId);
+      const res = await loanApi.fetchSalarySlipBlob(loanId);
+      if (res && res.blob) {
+        const url = URL.createObjectURL(res.blob);
+        setPreviewBlobUrl(url);
+        setPreviewFileName(res.fileName);
+        setPreviewIsImage(res.isImage);
+      }
     } catch (err: any) {
       alert(err.message || 'Failed to retrieve salary slip document');
+      setPreviewModalOpen(false);
     } finally {
       setFetchingDoc(false);
+      setPreviewLoading(false);
     }
   };
 
@@ -85,64 +130,82 @@ export default function SanctionDashboardPage() {
             </div>
           )}
 
-          {/* Queue Metrics */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          {/* Queue Statistics Header */}
+          <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <div>
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Awaiting Sanction Approval</span>
-              <span className="text-3xl font-black text-amber-600 block mt-1">{loans.length}</span>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">
+                Awaiting Sanction Approval
+              </span>
+              <span className="text-3xl font-black text-slate-900">{loans.length}</span>
             </div>
             <button
-              onClick={fetchLoans}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors"
+              onClick={() => fetchLoans(true)}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              Refresh Queue
+              <span>🔄</span>
+              <span>Refresh Queue</span>
             </button>
           </div>
 
-          {/* Applications Table */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-            <h2 className="text-lg font-bold text-slate-900">Sanction Review Queue</h2>
+          {/* Sanction Queue Table */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100">
+              <h2 className="text-lg font-black text-slate-900">Sanction Review Queue</h2>
+              <p className="text-slate-500 text-xs mt-0.5">
+                Review verified applications passed by Sales Team and make final credit approval decisions.
+              </p>
+            </div>
 
             {loading ? (
-              <div className="p-8 text-center text-slate-500 text-sm animate-pulse">Loading sanction queue...</div>
-            ) : error ? (
-              <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-lg">
-                {error}
+              <div className="p-12 text-center text-slate-400 text-xs font-bold animate-pulse">
+                Loading Sanction review applications...
               </div>
+            ) : error ? (
+              <div className="p-6 bg-rose-50 text-rose-700 text-xs font-bold">{error}</div>
             ) : loans.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-sm">No applications currently awaiting Sanction decision.</div>
+              <div className="p-12 text-center text-slate-400 text-xs font-semibold">
+                No pending loan applications awaiting Sanction approval.
+              </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-700">
-                  <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 font-extrabold uppercase tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="p-3">Loan ID</th>
-                      <th className="p-3">Borrower</th>
-                      <th className="p-3">PAN</th>
-                      <th className="p-3">Salary</th>
-                      <th className="p-3">Amount</th>
-                      <th className="p-3">Sales Remarks</th>
-                      <th className="p-3">Action</th>
+                      <th className="px-6 py-4">Borrower</th>
+                      <th className="px-6 py-4">PAN</th>
+                      <th className="px-6 py-4">Salary</th>
+                      <th className="px-6 py-4">Amount</th>
+                      <th className="px-6 py-4">Sales Remarks</th>
+                      <th className="px-6 py-4 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
                     {loans.map((loan) => (
-                      <tr key={loan._id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-3 font-mono font-bold text-slate-900">#{loan._id.slice(-6)}</td>
-                        <td className="p-3 font-bold text-slate-800">{loan.fullName}</td>
-                        <td className="p-3 font-mono">{loan.pan}</td>
-                        <td className="p-3">₹{loan.monthlySalary.toLocaleString('en-IN')}</td>
-                        <td className="p-3 font-bold text-blue-600">₹{loan.loanAmount.toLocaleString('en-IN')}</td>
-                        <td className="p-3 text-slate-500 italic max-w-xs truncate">{loan.salesRemarks || 'Reviewed'}</td>
-                        <td className="p-3">
+                      <tr key={loan._id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-6 py-4">
+                          <span className="font-bold text-slate-900 block">{loan.fullName}</span>
+                          <button
+                            onClick={() => handleViewSalarySlip(loan._id, loan.salarySlipOriginalName)}
+                            className="text-[10px] text-blue-600 font-bold hover:underline block mt-0.5 cursor-pointer"
+                          >
+                            📄 View Salary Slip ↗
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 font-mono font-bold uppercase">{loan.pan}</td>
+                        <td className="px-6 py-4 font-bold">₹{loan.monthlySalary.toLocaleString('en-IN')}</td>
+                        <td className="px-6 py-4 font-black text-blue-600">₹{loan.loanAmount.toLocaleString('en-IN')}</td>
+                        <td className="px-6 py-4 text-slate-600 font-normal italic">
+                          "{loan.salesRemarks || 'Verified by Sales Team'}"
+                        </td>
+                        <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => {
                               setSelectedLoan(loan);
                               setRemarks('');
                             }}
-                            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded transition-colors"
+                            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors cursor-pointer"
                           >
-                            Assess & Sanction
+                            Assess & Sanction →
                           </button>
                         </td>
                       </tr>
@@ -152,85 +215,70 @@ export default function SanctionDashboardPage() {
               </div>
             )}
           </div>
+        </main>
 
-          {/* Modal / Detailed Sanction Assessment Overlay */}
-          {selectedLoan && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto border border-slate-200 shadow-2xl">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                  <div>
-                    <h3 className="text-lg font-black text-slate-900">Sanction Decision Desk</h3>
-                    <p className="text-xs text-slate-500 font-mono">Loan ID: {selectedLoan._id}</p>
-                  </div>
-                  <button
-                    onClick={() => setSelectedLoan(null)}
-                    className="text-slate-400 hover:text-slate-600 font-bold text-lg"
-                  >
-                    ✕
-                  </button>
-                </div>
+        {/* Sanction Decision Modal */}
+        {selectedLoan && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg p-6 space-y-5">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 className="text-base font-black text-slate-900">
+                  Sanction Assessment #{selectedLoan._id.slice(-6).toUpperCase()}
+                </h3>
+                <button onClick={() => setSelectedLoan(null)} className="text-xs text-slate-400 font-bold hover:text-slate-600 cursor-pointer">
+                  ✕ Close
+                </button>
+              </div>
 
-                <div className="grid grid-cols-2 gap-4 text-xs">
-                  <div className="p-3 bg-slate-50 rounded-lg space-y-1">
-                    <p><strong>Applicant Name:</strong> {selectedLoan.fullName}</p>
-                    <p><strong>PAN:</strong> {selectedLoan.pan}</p>
-                    <p><strong>DOB:</strong> {new Date(selectedLoan.dateOfBirth).toLocaleDateString()}</p>
-                    <p><strong>Monthly Salary:</strong> ₹{selectedLoan.monthlySalary.toLocaleString('en-IN')}</p>
-                    <p><strong>Sales Notes:</strong> <em>{selectedLoan.salesRemarks || 'N/A'}</em></p>
-                  </div>
+              <div className="bg-slate-50 p-4 rounded-xl space-y-2 text-xs">
+                <p><strong className="text-slate-500 font-semibold">Applicant:</strong> {selectedLoan.fullName} ({selectedLoan.pan})</p>
+                <p><strong className="text-slate-500 font-semibold">Requested Amount:</strong> ₹{selectedLoan.loanAmount.toLocaleString('en-IN')} for {selectedLoan.tenureDays} Days</p>
+                <p><strong className="text-slate-500 font-semibold">Sales Notes:</strong> "{selectedLoan.salesRemarks || 'N/A'}"</p>
+              </div>
 
-                  <div className="p-3 bg-slate-50 rounded-lg space-y-1">
-                    <p><strong>Requested Amount:</strong> ₹{selectedLoan.loanAmount.toLocaleString('en-IN')}</p>
-                    <p><strong>Tenure:</strong> {selectedLoan.tenureDays} Days</p>
-                    <p><strong>Interest Rate:</strong> 12% p.a.</p>
-                    <p><strong>Simple Interest:</strong> ₹{selectedLoan.simpleInterest.toLocaleString('en-IN')}</p>
-                    <p className="font-bold text-blue-700">Total Repayment: ₹{selectedLoan.totalRepayment.toLocaleString('en-IN')}</p>
-                  </div>
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Sanction Remarks / Credit Approval Justification
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Credit score and debt-to-income ratio meet risk criteria. Approved."
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-900"
+                />
+              </div>
 
-                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium rounded-lg flex justify-between items-center">
-                  <span>BRE Status: <strong>PASSED</strong></span>
-                  <button
-                    onClick={() => handleViewSalarySlip(selectedLoan._id)}
-                    disabled={fetchingDoc}
-                    className="font-bold text-blue-600 hover:text-blue-800 underline disabled:opacity-50"
-                  >
-                    {fetchingDoc ? 'Opening Document...' : 'Inspect Salary Slip ↗'}
-                  </button>
-                </div>
+              <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+                <button
+                  disabled={submitting}
+                  onClick={() => handleSanctionAction('REJECT')}
+                  className="px-4 py-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                >
+                  Reject & Decline
+                </button>
 
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-slate-700 uppercase">Sanction Decision Remarks</label>
-                  <textarea
-                    rows={3}
-                    value={remarks}
-                    onChange={(e) => setRemarks(e.target.value)}
-                    placeholder="Enter sanction approval notes or rejection rationale..."
-                    className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
-                  <button
-                    onClick={() => handleSanctionAction('REJECT')}
-                    disabled={submitting}
-                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    {submitting ? 'Processing...' : 'REJECT Loan'}
-                  </button>
-
-                  <button
-                    onClick={() => handleSanctionAction('APPROVE')}
-                    disabled={submitting}
-                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors disabled:opacity-50"
-                  >
-                    {submitting ? 'Processing...' : 'APPROVE Sanction & Forward to Disbursement →'}
-                  </button>
-                </div>
+                <button
+                  disabled={submitting}
+                  onClick={() => handleSanctionAction('APPROVE')}
+                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors cursor-pointer"
+                >
+                  {submitting ? 'Processing...' : 'Sanction & Send to Disbursement →'}
+                </button>
               </div>
             </div>
-          )}
-        </main>
+          </div>
+        )}
+
+        {/* Document Preview Modal Overlay */}
+        <DocumentPreviewModal
+          isOpen={previewModalOpen}
+          onClose={() => setPreviewModalOpen(false)}
+          fileName={previewFileName}
+          blobUrl={previewBlobUrl}
+          isImage={previewIsImage}
+          isLoading={previewLoading}
+        />
       </div>
     </ProtectedRoute>
   );

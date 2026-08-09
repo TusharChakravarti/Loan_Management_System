@@ -5,6 +5,7 @@ import { ProtectedRoute } from '../../../../components/ProtectedRoute';
 import { BorrowerNav } from '../../../../components/BorrowerNav';
 import { DocumentPreviewModal } from '../../../../components/DocumentPreviewModal';
 import { loanApi } from '../../../../lib/api';
+import { subscribeToLoanUpdates } from '../../../../lib/events';
 import { Loan } from '../../../../types/loan';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -25,9 +26,10 @@ export default function SingleLoanDetailPage() {
   const [previewIsImage, setPreviewIsImage] = useState<boolean>(false);
   const [previewLoading, setPreviewLoading] = useState<boolean>(false);
 
-  // Real-time backend re-validation on mount & window focus
-  const fetchLoan = async () => {
+  // Real-time backend re-validation
+  const fetchLoan = async (showLoading = false) => {
     if (!id) return;
+    if (showLoading) setLoading(true);
     try {
       const res = await loanApi.getLoanById(id);
       setLoan(res.loan);
@@ -35,19 +37,33 @@ export default function SingleLoanDetailPage() {
     } catch (err: any) {
       setError(err.message || 'Failed to retrieve loan application details');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLoan();
+    fetchLoan(true);
 
-    const handleFocus = () => {
-      fetchLoan();
-    };
+    // 1. Silent Auto-Polling Heartbeat (3s)
+    const interval = setInterval(() => {
+      fetchLoan(false);
+    }, 3000);
+
+    // 2. Live Cross-Tab Event Subscription
+    const unsubscribe = subscribeToLoanUpdates(() => {
+      fetchLoan(false);
+    });
+
+    // 3. Window Focus & Visibility Change Listeners
+    const handleFocus = () => fetchLoan(false);
     window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
     return () => {
+      clearInterval(interval);
+      unsubscribe();
       window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
     };
   }, [id]);
 
@@ -311,17 +327,17 @@ export default function SingleLoanDetailPage() {
             </div>
           ) : null}
         </main>
-      </div>
 
-      {/* Reusable In-Page Document Preview Modal Overlay */}
-      <DocumentPreviewModal
-        isOpen={previewModalOpen}
-        onClose={() => setPreviewModalOpen(false)}
-        fileName={previewFileName}
-        blobUrl={previewBlobUrl}
-        isImage={previewIsImage}
-        isLoading={previewLoading}
-      />
+        {/* Document Preview Modal Overlay */}
+        <DocumentPreviewModal
+          isOpen={previewModalOpen}
+          onClose={() => setPreviewModalOpen(false)}
+          fileName={previewFileName}
+          blobUrl={previewBlobUrl}
+          isImage={previewIsImage}
+          isLoading={previewLoading}
+        />
+      </div>
     </ProtectedRoute>
   );
 }

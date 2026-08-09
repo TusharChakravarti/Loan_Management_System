@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
 import { OperationsNav } from '../../../components/OperationsNav';
 import { operationsApi } from '../../../lib/api';
+import { broadcastLoanUpdate, subscribeToLoanUpdates } from '../../../lib/events';
 import { Loan } from '../../../types/loan';
 
 export default function DisbursementDashboardPage() {
@@ -17,8 +18,8 @@ export default function DisbursementDashboardPage() {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
-  const fetchLoans = async () => {
-    setLoading(true);
+  const fetchLoans = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError(null);
     try {
       const res = await operationsApi.getDisbursementLoans();
@@ -26,12 +27,34 @@ export default function DisbursementDashboardPage() {
     } catch (err: any) {
       setError(err.message || 'Failed to load Disbursement queue');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLoans();
+    fetchLoans(true);
+
+    // 1. Silent Auto-Polling Heartbeat (3s)
+    const interval = setInterval(() => {
+      fetchLoans(false);
+    }, 3000);
+
+    // 2. Live Cross-Tab Event Subscription
+    const unsubscribe = subscribeToLoanUpdates(() => {
+      fetchLoans(false);
+    });
+
+    // 3. Window Focus & Visibility Change Listeners
+    const handleFocus = () => fetchLoans(false);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
   }, []);
 
   const handleDisburseLoan = async (e: React.FormEvent) => {
@@ -45,10 +68,14 @@ export default function DisbursementDashboardPage() {
         remarks,
       });
       setActionSuccess(res.message);
+
+      // Broadcast live event across all tabs/windows
+      broadcastLoanUpdate({ type: 'LOAN_DISBURSED', loanId: selectedLoan._id });
+
       setSelectedLoan(null);
       setDisbursementReference('');
       setRemarks('');
-      await fetchLoans();
+      await fetchLoans(false);
     } catch (err: any) {
       alert(err.message || 'Failed to disburse loan');
     } finally {
@@ -61,7 +88,7 @@ export default function DisbursementDashboardPage() {
       <div className="min-h-screen bg-slate-100 pb-12">
         <OperationsNav
           title="Disbursement Desk Module"
-          subtitle="Bank transfer execution & fund release"
+          subtitle="Fund release execution & banking reference management"
         />
 
         <main className="max-w-7xl mx-auto p-6 space-y-6">
@@ -74,65 +101,78 @@ export default function DisbursementDashboardPage() {
             </div>
           )}
 
-          {/* Queue Metrics */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          {/* Queue Statistics Header */}
+          <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <div>
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sanctioned Loans Awaiting Disbursement</span>
-              <span className="text-3xl font-black text-emerald-600 block mt-1">{loans.length}</span>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">
+                Awaiting Fund Disbursement
+              </span>
+              <span className="text-3xl font-black text-slate-900">{loans.length}</span>
             </div>
             <button
-              onClick={fetchLoans}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors"
+              onClick={() => fetchLoans(true)}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              Refresh Queue
+              <span>🔄</span>
+              <span>Refresh Queue</span>
             </button>
           </div>
 
-          {/* Applications Table */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-            <h2 className="text-lg font-bold text-slate-900">Disbursement Execution Queue</h2>
+          {/* Disbursement Queue Table */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100">
+              <h2 className="text-lg font-black text-slate-900">Disbursement Execution Queue</h2>
+              <p className="text-slate-500 text-xs mt-0.5">
+                Process sanctioned loan payouts and enter bank transaction references to activate loans.
+              </p>
+            </div>
 
             {loading ? (
-              <div className="p-8 text-center text-slate-500 text-sm animate-pulse">Loading disbursement queue...</div>
-            ) : error ? (
-              <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-lg">
-                {error}
+              <div className="p-12 text-center text-slate-400 text-xs font-bold animate-pulse">
+                Loading Disbursement queue applications...
               </div>
+            ) : error ? (
+              <div className="p-6 bg-rose-50 text-rose-700 text-xs font-bold">{error}</div>
             ) : loans.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-sm">No sanctioned loans currently awaiting disbursement.</div>
+              <div className="p-12 text-center text-slate-400 text-xs font-semibold">
+                No pending sanctioned applications awaiting disbursement.
+              </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-700">
-                  <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 font-extrabold uppercase tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="p-3">Loan ID</th>
-                      <th className="p-3">Borrower</th>
-                      <th className="p-3">PAN</th>
-                      <th className="p-3">Sanctioned Principal</th>
-                      <th className="p-3">Tenure</th>
-                      <th className="p-3">Sanction Remarks</th>
-                      <th className="p-3">Action</th>
+                      <th className="px-6 py-4">Borrower</th>
+                      <th className="px-6 py-4">PAN</th>
+                      <th className="px-6 py-4">Sanctioned Amount</th>
+                      <th className="px-6 py-4">Tenure</th>
+                      <th className="px-6 py-4">Sanction Remarks</th>
+                      <th className="px-6 py-4 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
                     {loans.map((loan) => (
-                      <tr key={loan._id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-3 font-mono font-bold text-slate-900">#{loan._id.slice(-6)}</td>
-                        <td className="p-3 font-bold text-slate-800">{loan.fullName}</td>
-                        <td className="p-3 font-mono">{loan.pan}</td>
-                        <td className="p-3 font-bold text-emerald-600">₹{loan.loanAmount.toLocaleString('en-IN')}</td>
-                        <td className="p-3">{loan.tenureDays} Days</td>
-                        <td className="p-3 text-slate-500 italic max-w-xs truncate">{loan.sanctionRemarks || 'Sanctioned'}</td>
-                        <td className="p-3">
+                      <tr key={loan._id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-6 py-4">
+                          <span className="font-bold text-slate-900 block">{loan.fullName}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">#{loan._id.slice(-6).toUpperCase()}</span>
+                        </td>
+                        <td className="px-6 py-4 font-mono font-bold uppercase">{loan.pan}</td>
+                        <td className="px-6 py-4 font-black text-emerald-600">₹{loan.loanAmount.toLocaleString('en-IN')}</td>
+                        <td className="px-6 py-4 font-bold">{loan.tenureDays} Days</td>
+                        <td className="px-6 py-4 text-slate-600 font-normal italic">
+                          "{loan.sanctionRemarks || 'Approved by Sanction Team'}"
+                        </td>
+                        <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => {
                               setSelectedLoan(loan);
-                              setDisbursementReference(`UTR-${Date.now().toString().slice(-8)}`);
+                              setDisbursementReference('');
                               setRemarks('');
                             }}
-                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded transition-colors"
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors cursor-pointer"
                           >
-                            Disburse Funds
+                            Disburse Funds →
                           </button>
                         </td>
                       </tr>
@@ -142,83 +182,74 @@ export default function DisbursementDashboardPage() {
               </div>
             )}
           </div>
-
-          {/* Modal / Disbursement Confirmation Form */}
-          {selectedLoan && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-              <form
-                onSubmit={handleDisburseLoan}
-                className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-5 border border-slate-200 shadow-2xl"
-              >
-                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                  <div>
-                    <h3 className="text-lg font-black text-slate-900">Confirm Fund Disbursement</h3>
-                    <p className="text-xs text-slate-500 font-mono">Loan ID: {selectedLoan._id}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedLoan(null)}
-                    className="text-slate-400 hover:text-slate-600 font-bold text-lg"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="p-4 bg-slate-50 rounded-xl space-y-1 text-xs">
-                  <p><strong>Borrower:</strong> {selectedLoan.fullName} ({selectedLoan.pan})</p>
-                  <p><strong>Disbursement Amount:</strong> <span className="font-extrabold text-emerald-600 text-sm">₹{selectedLoan.loanAmount.toLocaleString('en-IN')}</span></p>
-                  <p><strong>Tenure:</strong> {selectedLoan.tenureDays} Days</p>
-                  <p><strong>Sanction Notes:</strong> <em>{selectedLoan.sanctionRemarks || 'Approved'}</em></p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Bank Transfer Reference / UTR Number
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={disbursementReference}
-                    onChange={(e) => setDisbursementReference(e.target.value)}
-                    placeholder="e.g. UTR987654321"
-                    className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-mono font-bold text-slate-900 uppercase"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Disbursement Remarks (Optional)
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={remarks}
-                    onChange={(e) => setRemarks(e.target.value)}
-                    placeholder="Enter transfer details or confirmation notes..."
-                    className="w-full p-2.5 rounded-lg border border-slate-300 text-xs text-slate-900"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedLoan(null)}
-                    className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={submitting || !disbursementReference.trim()}
-                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm disabled:opacity-50 transition-colors"
-                  >
-                    {submitting ? 'Processing Disbursement...' : 'Execute Disbursement & Activate Loan →'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
         </main>
+
+        {/* Disbursement Execution Modal */}
+        {selectedLoan && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+            <form onSubmit={handleDisburseLoan} className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg p-6 space-y-5">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 className="text-base font-black text-slate-900">
+                  Disburse Loan #{selectedLoan._id.slice(-6).toUpperCase()}
+                </h3>
+                <button type="button" onClick={() => setSelectedLoan(null)} className="text-xs text-slate-400 font-bold hover:text-slate-600 cursor-pointer">
+                  ✕ Close
+                </button>
+              </div>
+
+              <div className="bg-purple-50 p-4 rounded-xl space-y-2 text-xs border border-purple-100 text-purple-900">
+                <p><strong className="font-semibold">Borrower Name:</strong> {selectedLoan.fullName}</p>
+                <p><strong className="font-semibold">Sanctioned Amount:</strong> ₹{selectedLoan.loanAmount.toLocaleString('en-IN')}</p>
+                <p><strong className="font-semibold">Total Repayment Balance:</strong> ₹{selectedLoan.totalRepayment.toLocaleString('en-IN')}</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Banking Transaction Reference / UTR Number *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. UTR192837465012"
+                  value={disbursementReference}
+                  onChange={(e) => setDisbursementReference(e.target.value)}
+                  className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-mono font-bold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Disbursement Remarks (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Transferred via NEFT/RTGS to borrower bank account."
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-900"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setSelectedLoan(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={submitting || !disbursementReference.trim()}
+                  className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {submitting ? 'Executing Payout...' : 'Confirm Disburse & Activate Loan →'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
     </ProtectedRoute>
   );
