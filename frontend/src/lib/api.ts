@@ -118,6 +118,26 @@ export const authApi = {
     return data;
   },
 
+  googleToken: async (token: string): Promise<AuthResponse> => {
+    const data = await apiFetch('/auth/google/token', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+    setAuthToken(data.token);
+    return data;
+  },
+
+  forgotPassword: async (email: string): Promise<{ success: boolean; message: string }> => {
+    return await apiFetch('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  getGoogleAuthUrl: (): string => {
+    return `${API_BASE_URL}/auth/google`;
+  },
+
   getMe: async (): Promise<{ user: User }> => {
     return await apiFetch('/auth/me');
   },

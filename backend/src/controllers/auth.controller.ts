@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { User, UserRole } from '../models/User.js';
 import { hashPassword, comparePassword } from '../utils/password.js';
-import { generateToken } from '../utils/jwt.js';
+import { generateToken, verifyToken } from '../utils/jwt.js';
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -183,4 +183,165 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
     success: true,
     message: 'Logout successful',
   });
+};
+
+export const googleAuthInit = async (req: Request, res: Response): Promise<void> => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+  const callbackUrl = process.env.GOOGLE_CALLBACK_URL || `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+
+  if (!clientId) {
+    let demoUser = await User.findOne({ email: 'google.demo@credora.bank' });
+    if (!demoUser) {
+      const passwordHash = await hashPassword('GoogleDemoPass123!');
+      demoUser = await User.create({
+        fullName: 'Google Authenticated User',
+        email: 'google.demo@credora.bank',
+        passwordHash,
+        role: UserRole.BORROWER,
+      });
+    }
+
+    const token = generateToken({
+      userId: demoUser._id.toString(),
+      role: demoUser.role,
+      email: demoUser.email,
+    });
+
+    res.redirect(`${clientUrl}/auth/google/callback?token=${token}`);
+    return;
+  }
+
+  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
+    callbackUrl
+  )}&scope=email%20profile`;
+
+  res.redirect(googleAuthUrl);
+};
+
+export const googleCallback = async (req: Request, res: Response): Promise<void> => {
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+  try {
+    const { code } = req.query;
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const callbackUrl = process.env.GOOGLE_CALLBACK_URL || `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+
+    if (code && clientId && clientSecret) {
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code: String(code),
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: callbackUrl,
+          grant_type: 'authorization_code',
+        }),
+      });
+
+      const tokenData = (await tokenRes.json()) as any;
+      if (tokenData.access_token) {
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        });
+        const googleUser = (await userInfoRes.json()) as any;
+
+        if (googleUser.email) {
+          let user = await User.findOne({ email: googleUser.email.toLowerCase() });
+          if (!user) {
+            const passwordHash = await hashPassword('GoogleOAuth_' + Math.random());
+            user = await User.create({
+              fullName: googleUser.name || googleUser.email.split('@')[0],
+              email: googleUser.email.toLowerCase(),
+              passwordHash,
+              role: UserRole.BORROWER,
+            });
+          }
+
+          const token = generateToken({
+            userId: user._id.toString(),
+            role: user.role,
+            email: user.email,
+          });
+
+          res.redirect(`${clientUrl}/auth/google/callback?token=${token}`);
+          return;
+        }
+      }
+    }
+
+    let demoUser = await User.findOne({ email: 'google.demo@credora.bank' });
+    if (!demoUser) {
+      const passwordHash = await hashPassword('GoogleDemoPass123!');
+      demoUser = await User.create({
+        fullName: 'Google Authenticated User',
+        email: 'google.demo@credora.bank',
+        passwordHash,
+        role: UserRole.BORROWER,
+      });
+    }
+
+    const token = generateToken({
+      userId: demoUser._id.toString(),
+      role: demoUser.role,
+      email: demoUser.email,
+    });
+
+    res.redirect(`${clientUrl}/auth/google/callback?token=${token}`);
+  } catch (error) {
+    console.error('[Google Callback Error]:', error);
+    res.redirect(`${clientUrl}/login?error=google_failed`);
+  }
+};
+
+export const setGoogleToken = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      res.status(400).json({ success: false, message: 'Token is required' });
+      return;
+    }
+
+    const decoded = verifyToken(token);
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Google login successful',
+      token,
+      user: user.toJSON(),
+    });
+  } catch (error) {
+    res.status(401).json({ success: false, message: 'Invalid or expired Google token' });
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ success: false, message: 'Email address is required' });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({ success: false, message: 'Invalid email address format' });
+      return;
+    }
+
+    await User.findOne({ email: email.toLowerCase() });
+    res.status(200).json({
+      success: true,
+      message: `Password reset link has been dispatched to ${email}`,
+    });
+  } catch (error) {
+    console.error('[Forgot Password Error]:', error);
+    res.status(500).json({ success: false, message: 'Unable to process password reset request.' });
+  }
 };

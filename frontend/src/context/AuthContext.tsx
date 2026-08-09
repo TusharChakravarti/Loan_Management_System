@@ -10,6 +10,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
+  loginWithGoogleToken: (googleToken: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -60,6 +61,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(res.token);
   };
 
+  const loginWithGoogleToken = async (googleToken: string) => {
+    const res = await authApi.googleToken(googleToken);
+    setUser(res.user);
+    setToken(res.token);
+  };
+
   const logout = async () => {
     await authApi.logout();
     setUser(null);
@@ -74,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login,
         register,
+        loginWithGoogleToken,
         logout,
         refreshUser: fetchCurrentUser,
       }}
