@@ -50,9 +50,9 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-between p-6 selection:bg-credora-600 selection:text-white">
+    <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-between selection:bg-credora-600 selection:text-white">
       {/* Header */}
-      <header className="max-w-7xl mx-auto w-full flex justify-between items-center py-4 border-b border-slate-800/80">
+      <header className="max-w-7xl mx-auto w-full flex justify-between items-center px-4 sm:px-6 py-4 border-b border-slate-800/80">
         <CredoraLogo variant="full" size="md" showTagline />
 
         <div className="flex items-center gap-3">
@@ -73,7 +73,7 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto w-full text-center space-y-8 my-16">
+      <main className="max-w-4xl mx-auto w-full text-center space-y-8 px-4 sm:px-6 my-12 md:my-16">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-credora-950/80 border border-credora-800/80 text-credora-300 text-xs font-extrabold tracking-wide">
           <span className="w-2 h-2 rounded-full bg-credora-400 animate-pulse"></span>
           Institutional Digital Lending & Operations Infrastructure
