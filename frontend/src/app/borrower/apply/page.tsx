@@ -512,7 +512,9 @@ export default function ApplyLoanPage() {
                     <input
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                      onChange={(e) => {
+                        setError(null)
+                        setSelectedFile(e.target.files?.[0] || null)}}
                       className="hidden"
                       id="salarySlipInput"
                     />
