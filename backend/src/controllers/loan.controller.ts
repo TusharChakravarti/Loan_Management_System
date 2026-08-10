@@ -348,7 +348,7 @@ export const getLoanSalarySlipDocumentHandler = async (req: Request, res: Respon
     }
 
     const { id } = req.params;
-    const loan = await Loan.findById(id);
+    const loan = await Loan.findById(id)
 
     if (!loan) {
       res.status(404).json({
