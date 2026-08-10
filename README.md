@@ -1,7 +1,4 @@
-RA_README.md
-
-
-CREDORA --- Digital Loan Management Platform
+#CREDORA --- Digital Loan Management Platform
 CREDORA is a full-stack digital loan management platform designed to
 streamline the complete loan lifecycle --- from borrower registration
 and document submission to sales review, sanction assessment,
