@@ -42,7 +42,7 @@ export const CredoraHeader: React.FC<CredoraHeaderProps> = ({
   return (
     <header className="fixed top-0 left-0 right-0 w-full h-16 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors duration-200 shadow-2xs">
       <div className="w-full h-full px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 max-w-full">
-        {/* Logo & page title */}
+       
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           {onMobileMenuToggle && (
             <button

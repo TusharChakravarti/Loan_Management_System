@@ -1,7 +1,3 @@
-/**
- * Cross-Tab / Cross-Window Live Broadcast Engine
- * Enables real-time background synchronization between Borrower & Operations portals
- */
 
 const CHANNEL_NAME = 'lms_loan_updates_channel';
 const STORAGE_KEY = 'lms_loan_update_event';
@@ -38,7 +34,7 @@ export const broadcastLoanUpdate = (event: Omit<LoanUpdateEvent, 'timestamp'>): 
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch {
-      // Ignore storage write error
+     
     }
   }
 };
@@ -67,7 +63,7 @@ export const subscribeToLoanUpdates = (onUpdate: (event: LoanUpdateEvent) => voi
         const parsed = JSON.parse(e.newValue);
         onUpdate(parsed);
       } catch {
-        // Ignore parse error
+   
       }
     }
   };

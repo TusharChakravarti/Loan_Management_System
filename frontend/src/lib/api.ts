@@ -153,7 +153,7 @@ export const authApi = {
     try {
       await apiFetch('/auth/logout', { method: 'POST' });
     } catch {
-      // Ignore network errors on logout
+      
     } finally {
       setAuthToken(null);
     }
@@ -194,10 +194,7 @@ export const loanApi = {
     });
   },
 
-  /**
-   * AUTHENTICATED BINARY SALARY SLIP FETCH
-   * Sends Authorization: Bearer <token> to backend proxy endpoint and returns raw blob + metadata
-   */
+ 
   fetchSalarySlipBlob: async (loanId: string): Promise<{ blob: Blob; fileName: string; isImage: boolean }> => {
     const token = getAuthToken();
     if (!token) {

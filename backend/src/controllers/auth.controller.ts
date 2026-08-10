@@ -358,7 +358,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
     console.log(`👉 Direct Reset Link: ${resetUrl}`);
     console.log(`======================================================\n`);
 
-    // Dispatch real email via Resend API if key is present
+   
     const resendApiKey = process.env.RESEND_API_KEY?.trim();
     if (resendApiKey) {
       try {

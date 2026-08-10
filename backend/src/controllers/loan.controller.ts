@@ -56,12 +56,7 @@ export const checkBREHandler = async (req: Request, res: Response): Promise<void
   }
 };
 
-/**
- * CLOUDINARY SALARY SLIP UPLOAD HANDLER
- * Streams Multer memory storage file buffer directly to Cloudinary.
- * Uploads to dedicated folder: loan-management/salary-slips
- * Captures public_id, resource_type, format, and original filename.
- */
+
 export const uploadSalarySlipHandler = async (req: Request, res: Response): Promise<void> => {
   if (!req.file) {
     res.status(400).json({
@@ -74,7 +69,7 @@ export const uploadSalarySlipHandler = async (req: Request, res: Response): Prom
 
   const ext = path.extname(req.file.originalname).toLowerCase().replace('.', '');
   const isPdf = ext === 'pdf';
-  // Use raw resource_type for PDFs to guarantee exact document delivery in Cloudinary
+
   const resourceType = isPdf ? 'raw' : 'auto';
 
   try {
@@ -90,7 +85,7 @@ export const uploadSalarySlipHandler = async (req: Request, res: Response): Prom
       return;
     }
 
-    // Stream Multer memory buffer directly to Cloudinary dedicated folder: loan-management/salary-slips
+    
     const uploadPromise = new Promise<{ secure_url: string; public_id: string; resource_type: string; format: string }>(
       (resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
@@ -133,7 +128,6 @@ export const uploadSalarySlipHandler = async (req: Request, res: Response): Prom
     } catch (streamErr: any) {
       console.error('[Loan Controller] Salary Slip Cloudinary Stream Error:', streamErr);
 
-      // Automated integration test mode fallback (when running integration tests with restricted API keys)
       if (process.env.NODE_ENV === 'test' || req.headers['x-test-mode'] === 'true') {
         const testPublicId = `loan-management/salary-slips/test-${Date.now()}`;
         const testUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME?.trim() || 'dldmheoht'}/image/upload/v1234567/${testPublicId}.pdf`;
@@ -149,7 +143,7 @@ export const uploadSalarySlipHandler = async (req: Request, res: Response): Prom
         return;
       }
 
-      // Production sanitized error response
+ 
       res.status(500).json({
         success: false,
         error: 'Upload Error',
@@ -167,11 +161,7 @@ export const uploadSalarySlipHandler = async (req: Request, res: Response): Prom
   }
 };
 
-/**
- * SECURE SALARY SLIP STREAMING PREVIEW ENDPOINT (GET /api/loans/:id/salary-slip/preview)
- * Authenticates user via Bearer token, verifies RBAC borrower ownership, fetches binary asset server-side,
- * validates Content-Type and PDF magic bytes (%PDF-), and streams it directly to client with Content-Disposition: inline.
- */
+
 export const previewSalarySlipDocumentHandler = async (req: Request, res: Response): Promise<void> => {
   try {
     if (!req.user) {
@@ -198,8 +188,7 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
     const userRole = req.user.role;
     const userId = req.user.userId;
 
-    // Strict Security & RBAC Isolation:
-    // Borrower can ONLY view their own loan salary slip document.
+ 
     if (userRole === UserRole.BORROWER) {
       if (loan.borrowerId.toString() !== userId) {
         res.status(403).json({
@@ -212,7 +201,7 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
     } else if (userRole === UserRole.SALES || userRole === UserRole.SANCTION || userRole === UserRole.ADMIN) {
       // Authorized officers
     } else {
-      // COLLECTION or other unauthorized roles
+     
       res.status(403).json({
         success: false,
         error: 'Forbidden',
@@ -230,7 +219,6 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
       return;
     }
 
-    // Infer MIME Content-Type based on original filename / extension
     const ext = path.extname(loan.salarySlipOriginalName || loan.salarySlipUrl).toLowerCase();
     const isPdf = ext === '.pdf' || !ext;
     let contentType = 'application/pdf';
@@ -244,7 +232,7 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
 
     const isHttpUrl = loan.salarySlipUrl.startsWith('http://') || loan.salarySlipUrl.startsWith('https://');
 
-    // 1. Check if document reference is a local relative file path (Legacy records)
+   
     if (!isHttpUrl) {
       const sanitizedFilename = path.basename(loan.salarySlipUrl);
       const filePath = path.join(process.cwd(), 'uploads', 'salary-slips', sanitizedFilename);
@@ -265,7 +253,7 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
       }
     }
 
-    // 2. Server-side fetch from Cloudinary HTTP/HTTPS delivery URL
+  
     const targetUrl = loan.salarySlipUrl;
     const docFetchRes = await fetch(targetUrl);
 
@@ -281,7 +269,7 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
       return;
     }
 
-    // 3. Validate Cloudinary Content-Type (Reject HTML error pages, JSON, XML)
+    //Validate Cloudinary Content-Type 
     const fetchedContentType = docFetchRes.headers.get('content-type') || '';
     if (isPdf && (fetchedContentType.includes('text/html') || fetchedContentType.includes('application/json') || fetchedContentType.includes('text/plain'))) {
       console.error('[Salary Slip Preview] Non-PDF Content-Type received from storage:', {
@@ -294,7 +282,7 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
       return;
     }
 
-    // 4. Read binary buffer and validate PDF magic bytes (%PDF-)
+    //  Read binary buffer and validate PDF magic bytes (%PDF-)
     const arrayBuffer = await docFetchRes.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
@@ -309,7 +297,7 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
 
     const isPdfMagic = buffer.length >= 5 && buffer.subarray(0, 5).toString('utf-8') === '%PDF-';
 
-    // Safe backend debug log (No tokens, secrets, or full URIs)
+    
     console.log('[Salary Slip Preview]', {
       status: docFetchRes.status,
       contentType: fetchedContentType,
@@ -347,10 +335,7 @@ export const previewSalarySlipDocumentHandler = async (req: Request, res: Respon
   }
 };
 
-/**
- * SECURE SALARY SLIP ACCESS API (GET /api/loans/:id/salary-slip)
- * Authenticates user, verifies RBAC authorization, and returns secure document metadata & URL.
- */
+
 export const getLoanSalarySlipDocumentHandler = async (req: Request, res: Response): Promise<void> => {
   try {
     if (!req.user) {
@@ -388,9 +373,9 @@ export const getLoanSalarySlipDocumentHandler = async (req: Request, res: Respon
         return;
       }
     } else if (userRole === UserRole.SALES || userRole === UserRole.SANCTION || userRole === UserRole.ADMIN) {
-      // Sales, Sanction, and Admin officers are authorized for application document processing
+    
     } else {
-      // COLLECTION or other unauthorized roles
+     
       res.status(403).json({
         success: false,
         error: 'Forbidden',
