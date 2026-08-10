@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # CREDORA --- Digital Loan Management Platform
 
 CREDORA is a full-stack digital loan management platform designed to
