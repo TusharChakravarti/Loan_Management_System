@@ -362,7 +362,7 @@ export const getLoanSalarySlipDocumentHandler = async (req: Request, res: Respon
     const userRole = req.user.role;
     const userId = req.user.userId;
 
-    // RBAC Business Authorization Check
+    // RBAC Business Authorization Checks
     if (userRole === UserRole.BORROWER) {
       if (loan.borrowerId.toString() !== userId) {
         res.status(403).json({
