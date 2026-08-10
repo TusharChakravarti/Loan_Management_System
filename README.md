@@ -209,8 +209,6 @@ configured business rules.
 Borrowers can upload documents required for loan processing.
 
 The application supports:
-
-<<<<<<< HEAD
 -   Salary slips and other loan-related documents
 -   Document previews
 -   Cloud-based document storage
@@ -239,13 +237,12 @@ Image/PDF handling
 
 Cloudinary is used for cloud-based media/document management.
 
-🔑 Google OAuth
->>>>>>> d64ab581774018aec96dee2870aa738fefd85bd2
+
 CREDORA supports Google-based authentication.
 
 The high-level authentication flow is:
 
-<<<<<<< HEAD
+
 ``` text
 User
   ↓
@@ -334,13 +331,13 @@ Authorization
 Answers:
 
 What is this user allowed to access?
->>>>>>> d64ab581774018aec96dee2870aa738fefd85bd2
+
 
 The user's role determines access to protected functionality.
 
 For example:
 
-<<<<<<< HEAD
+
 ``` text
 =======
 >>>>>>> d64ab581774018aec96dee2870aa738fefd85bd2
@@ -355,7 +352,7 @@ Sales APIs / Dashboard
 ADMIN
    ↓
 Administrative APIs / Dashboard
-<<<<<<< HEAD
+
 ```
 
 This prevents users from accessing functionality outside their assigned
@@ -512,7 +509,7 @@ CREDORA/
 │   ├── services/
 │   └── ...
 │
-<<<<<<< HEAD
+
 └── README.md
 ```
 
@@ -555,7 +552,7 @@ Disbursement
 Repayment
       ↓
 Loan Closed
-<<<<<<< HEAD
+
 ```
 
 Each stage is controlled by the application's backend workflow and role
@@ -604,7 +601,7 @@ Total Repayment
 EMI / Payment Schedule
      ↓
 Outstanding Balance
-<<<<<<< HEAD
+
 ```
 
 The frontend displays these values to the user while the backend remains
@@ -691,7 +688,7 @@ GitHub Repository
 Vercel
        ↓
 Production Frontend
-<<<<<<< HEAD
+
 ```
 
 ### Backend
@@ -703,13 +700,13 @@ The backend is deployed using **Render**.
 Backend
 The backend can be deployed using Render.
 
->>>>>>> d64ab581774018aec96dee2870aa738fefd85bd2
+
 GitHub Repository
        ↓
 Render
        ↓
 Production API
-<<<<<<< HEAD
+
 ```
 
 ### Production Configuration
